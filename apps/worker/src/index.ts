@@ -29,7 +29,7 @@ import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import { bundleWorkflowCode, Worker } from '@temporalio/worker';
 import { createActivities } from './activities';
 import { createClipActivities } from './clips/activities';
-import { bootClips, workerPlan } from './clips/boot';
+import { bootClips, mediaSlotShortfall, workerPlan } from './clips/boot';
 import type { ClipActivityDeps } from './clips/deps';
 import { loadWorkerEnv, servesRole } from './config/env';
 import { createAnalyticsSource } from './lib/analytics-source';
@@ -130,6 +130,13 @@ async function main(): Promise<void> {
   };
   process.once('SIGINT', () => stopAll('SIGINT received'));
   process.once('SIGTERM', () => stopAll('SIGTERM received'));
+
+  const shortfall = mediaSlotShortfall(env);
+  if (shortfall > 0) {
+    console.warn(
+      `[worker] WORKER_MEDIA_CONCURRENCY is ${env.WORKER_MEDIA_CONCURRENCY}, ${shortfall} fewer than CLIPS_MEDIA_SLOTS + CLIPS_MEDIA_PY_SLOTS: unless other media workers make up the rest, a listen can wait behind the Find Clips runs waiting for it`,
+    );
+  }
 
   for (const planned of plan) {
     console.log(

@@ -29,6 +29,8 @@ import {
 } from '@postgear/video-engine';
 import { TriangleAlert } from 'lucide-react';
 import type { EmoteView } from '@/types/clips-emotes';
+import { WaitingNote } from '../waiting-note';
+import { jobWords } from '../waiting-words';
 import { EXPIRED_LINE, keptLine, madeAtLine } from './emote-model';
 
 export interface EmoteResultProps {
@@ -55,8 +57,9 @@ export function EmoteResult({ view, onSave, saving }: EmoteResultProps) {
   if (job.status !== 'DONE' || !emote) {
     return (
       <div className="flex flex-col gap-2" data-testid="emote-running" aria-live="polite">
-        <p className="m-0 font-sans text-sm text-ink">{job.stageLabel}</p>
+        <p className="m-0 font-sans text-sm text-ink">{jobWords(job)}</p>
         <Progress value={job.progress} aria-label="Making the emote" />
+        <WaitingNote job={job} className="m-0 font-sans text-sm text-ink type-muted" />
       </div>
     );
   }

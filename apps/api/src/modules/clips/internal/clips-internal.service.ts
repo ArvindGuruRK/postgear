@@ -20,8 +20,8 @@
  *   not a clip), and the download's `output.media` says `saved`. One
  *   serializable transaction, so a retried call answers the same row; a call
  *   for a download that is not saving (deleted, or never asked) is a 409.
- * - **settled**: a job ended; start the workspace's waiting imports and
- *   the exports the fair render queue allows (Sprint 13, Module 11), and,
+ * - **settled**: a job ended; count its time in its kind's pace, run one
+ *   scheduler pass (Sprint 13, Module 15), and,
  *   for an export of a batch, write the batch's one notice when it was the
  *   last to end. An export of a batch rings no bell of its own at
  *   finish-export: the batch notice counts it.
@@ -58,6 +58,7 @@ import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { ClipRecipeApplierService } from '../recipes/clip-recipe-applier.service';
+import { ClipCostService } from '../costs/clip-cost.service';
 import { batchIdOf, ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
 import { exportReadyNotice } from './clip-notices';
 import type {
@@ -85,6 +86,8 @@ export class ClipsInternalService {
     @Optional() private readonly recipes?: ClipRecipeApplierService,
     // Sprint 13, Module 11: Export All's one notice (optional only for older specs).
     @Optional() private readonly batchNotices?: ClipBatchNoticeService,
+    // Sprint 13, Module 15: each job's cost when it ends (optional only for older specs).
+    @Optional() private readonly costs?: ClipCostService,
   ) {}
 
   /**
@@ -173,12 +176,21 @@ export class ClipsInternalService {
     return reversed.duplicate ? 0 : 1;
   }
 
+  /**
+   * A job ended (Module 15): its time is counted in its kind's pace (the
+   * estimate behind "Waiting for our turn, about 4 minutes"), one scheduler
+   * pass starts what its slot lets in, and an export of a batch writes the
+   * batch's notice when it was the last to end. Each step is best-effort and
+   * never fails the worker's call.
+   */
   async settled(jobId: string, body: OrgOnlyBody): Promise<ClipSettledAnswer> {
     const job = await this.requireJob(body.organizationId, jobId);
-    const started = await this.jobs.startWaiting(body.organizationId);
-    const renders = await this.jobs.startRendersQuietly(body.organizationId);
+    await this.jobs.recordDuration(job);
+    // Module 15: what the job cost us (never throws; the reconcile mends a missed one).
+    await this.costs?.record(body.organizationId, jobId);
+    const started = await this.jobs.startNext(body.organizationId);
     await this.batchNotices?.settleJob(job);
-    return { started: started.length + renders.length };
+    return { started: started.length };
   }
 
   async finishExport(jobId: string, body: FinishExportBody): Promise<ClipFinishExportAnswer> {

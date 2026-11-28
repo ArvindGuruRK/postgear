@@ -17,6 +17,7 @@ function view(patch: Partial<ClipJobView> = {}): ClipJobView {
     createdAt: '2026-11-18T10:00:00.000Z',
     startedAt: '2026-11-18T10:00:01.000Z',
     finishedAt: null,
+    waiting: null,
     ...patch,
   };
 }

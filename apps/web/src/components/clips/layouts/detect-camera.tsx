@@ -26,6 +26,9 @@ import { useEffect, useRef, useState } from 'react';
 import { NOTE } from '@/components/studio/panel-ui';
 import { ApiError } from '@/lib/api';
 import { ensureClipFaces, readClipFaces } from '@/lib/clips-api';
+import type { ClipJobView } from '@/types/clips';
+import { WaitingNote } from '../waiting-note';
+import { queuedOr } from '../waiting-words';
 import {
   CAMERA_MOVED,
   cameraAreaOf,
@@ -44,7 +47,7 @@ const POLL_LIMIT = 180;
 
 type Phase =
   | { kind: 'idle' }
-  | { kind: 'finding'; progress: number }
+  | { kind: 'finding'; progress: number; job: Pick<ClipJobView, 'status' | 'waiting'> | null }
   | { kind: 'none' }
   | { kind: 'failed'; message: string };
 
@@ -99,12 +102,12 @@ export function DetectCamera({
     const controller = new AbortController();
     abort.current = controller;
     const { signal } = controller;
-    setPhase({ kind: 'finding', progress: 0 });
+    setPhase({ kind: 'finding', progress: 0, job: null });
     try {
       const started = await deps.ensure(clipId);
       let read = await deps.read(clipId, { signal });
       for (let tries = 0; read.status === 'running' && tries < POLL_LIMIT; tries += 1) {
-        setPhase({ kind: 'finding', progress: read.job.progress });
+        setPhase({ kind: 'finding', progress: read.job.progress, job: read.job });
         await deps.wait(POLL_MS);
         if (signal.aborted) return;
         read = await deps.read(clipId, { signal });
@@ -144,7 +147,8 @@ export function DetectCamera({
       {finding ? (
         <div className="flex flex-col gap-2">
           <Progress tone="ai" value={phase.progress} aria-label={FINDING_FACES} />
-          <p className={NOTE}>{FINDING_FACES}</p>
+          <p className={NOTE}>{queuedOr(phase.job, FINDING_FACES)}</p>
+          <WaitingNote job={phase.job} className={NOTE} />
         </div>
       ) : (
         <Button

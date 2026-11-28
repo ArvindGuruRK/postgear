@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * The operator page (Sprint 12, Module 19 Part B): five tabs on one page,
- * Plans, Workspace Overrides, Usage, Change Log and Library. The open tab is
+ * The operator page (Sprint 12, Module 19 Part B): six tabs on one page,
+ * Plans, Workspace Overrides, Usage, Costs (Sprint 13, Module 15), Change Log
+ * and Library. The open tab is
  * kept in `?tab=` so a reload or a shared address opens the same one; the
  * address changes through the history API, so switching tabs never asks the
  * server for the page again. Workspace Overrides and Usage share the picked
@@ -14,6 +15,7 @@ import { useCallback, useState } from 'react';
 import { api } from '@/lib/api';
 import type { EndingOverride, OperatorTab, PlansView, WorkspaceSummary } from '@/types/operator';
 import { ChangeLogTab } from './change-log-tab';
+import { CostsTab } from './costs-tab';
 import { LibraryTab } from './library-tab';
 import { errorSentence } from './operator-fields';
 import { OPERATOR_TAB_NAMES, OPERATOR_TABS } from './operator-model';
@@ -101,6 +103,10 @@ export function OperatorView({
 
       <TabsContent value="usage" className="mt-0">
         <UsageTab workspace={workspace} onWorkspace={pickWorkspace} />
+      </TabsContent>
+
+      <TabsContent value="costs" className="mt-0">
+        <CostsTab />
       </TabsContent>
 
       <TabsContent value="changes" className="mt-0">

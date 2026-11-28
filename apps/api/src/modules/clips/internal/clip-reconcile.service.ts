@@ -3,23 +3,31 @@
  * maintenance workflow on `/internal/clips/reconcile`. It mends what a lost
  * message left behind, in every workspace, a bounded batch per pass:
  *
- * - **QUEUED, older than `CLIP_RECONCILE_START_AFTER_MS`**: an IMPORT that
- *   never held a slot just waits for `startWaiting` below. One that holds a
- *   slot, or any other kind, is looked up in Temporal: running is left
- *   alone, never started is started again (an IMPORT gives its slot back
- *   and queues like the rest), closed without writing its row is failed.
+ * - **QUEUED, waiting for its turn** (not claimed): the scheduler's, never
+ *   the reconcile's (Sprint 13, Module 15, Module 11's rule for exports now
+ *   for every kind). The pass runs one scheduler pass at the end; it never
+ *   restarts such a job itself.
+ * - **QUEUED, claimed longer than `CLIP_RECONCILE_START_AFTER_MS` ago**, or
+ *   a Preview Export made that long ago: a start that may have been lost,
+ *   looked up in Temporal. Running is left alone; closed without writing its
+ *   row is failed; never started gives its slot back and waits for its turn
+ *   again (a Preview Export, outside the scheduler, is started again).
  * - **RUNNING with no write for the same time**: failed only when Temporal
  *   says its workflow is closed or gone; a quiet running one is left.
+ * - **A paid AI job never started with no charge left** (Sprint 13, Module
+ *   15: a listen, a Find Clips run or a voice whose charge was refused or
+ *   lost after its row was written) is failed, never started: a claimed one
+ *   whose start was lost, and one still waiting for its turn (the scheduler
+ *   never starts it) made longer than `CLIP_RECONCILE_START_AFTER_MS` ago.
+ *   The waiting one is failed even while Temporal is out of reach: it was
+ *   never handed to it.
  * - A failed job gets our sentence, its charges reversed, and an IMPORT's
  *   video goes FAILED with the bell saying so. A DOWNLOAD's folder is
  *   emptied (both its charges come back with the rest).
  * - **Temporal unreachable**: the pass stops and changes nothing more, so a
  *   network blip never fails healthy jobs.
- * - **Exports** (Sprint 13, Module 11, the fair render queue): an export
- *   that never held a slot is waiting for its turn and is left to
- *   `startWaitingRenders` at the end of the pass; one that held a slot but
- *   never started gives the slot back and queues again, as an IMPORT does.
- *   A failed export of a batch rings no bell of its own; the batch's one
+ * - **Exports** (Sprint 13, Module 11): a failed export of a batch rings
+ *   no bell of its own; the batch's one
  *   notice is written when it was the last to end, and recent batches are
  *   settled again in case a `settled` call was lost.
  *
@@ -42,13 +50,27 @@ import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SchedulingService } from '../../scheduling/scheduling.service';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
-import { ClipJobsService, isQueuedRender } from '../jobs/clip-jobs.service';
+import { isWaitingTurn } from '../jobs/clip-job-view';
+import { ClipJobsService } from '../jobs/clip-jobs.service';
+import { PAID_AI_KINDS, schedulerClassOf } from '../jobs/clip-scheduler.rules';
+import { liveChargeFor } from '../clips-ai-charges';
+import { ClipCostService } from '../costs/clip-cost.service';
 import { batchIdOf, ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
 import { exportFailedNotice, videoFailedNotice } from './clip-notices';
+
+/**
+ * Sprint 13, Module 15: the kinds whose own job is charged AI minutes at the
+ * press (listening, Find Clips, a made voice). Neither the scheduler nor the
+ * reconcile starts one whose charge is gone. Kept with the scheduler's rules
+ * (`clip-scheduler.rules.ts`), which use it too.
+ */
+export { PAID_AI_KINDS };
 
 /** Jobs looked at per pass, per list: keeps one pass well inside its activity timeout. */
 export const RECONCILE_QUEUED_BATCH = 100;
 export const RECONCILE_RUNNING_BATCH = 50;
+/** Paid AI jobs waiting for their turn looked at per pass, for a charge that never landed. */
+export const RECONCILE_UNCHARGED_BATCH = 50;
 
 /**
  * The engine code a job that was lost fails with. A run Temporal stopped at
@@ -69,6 +91,9 @@ export function lostJobCode(job: Pick<ClipJob, 'kind' | 'input'>, timedOut = fal
   return 'tool_failed';
 }
 
+/** How far back the reconcile mends a missing job cost. */
+const COST_MEND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class ClipReconcileService {
   private readonly logger = new Logger(ClipReconcileService.name);
@@ -82,22 +107,19 @@ export class ClipReconcileService {
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
     // Module 11: Export All's one notice (optional only for older specs).
     @Optional() private readonly batchNotices?: ClipBatchNoticeService,
+    // Module 15: mends the cost of a job whose `settled` call was lost (optional only for older specs).
+    @Optional() private readonly costs?: ClipCostService,
   ) {}
 
   async reconcile(now = new Date()): Promise<ClipReconcileAnswer> {
     const before = new Date(now.getTime() - CLIP_RECONCILE_START_AFTER_MS);
-    const orgs = new Set<string>();
     let started = 0;
     let failed = 0;
     let reachable = true;
 
     for (const job of await this.repository.staleQueued(before, RECONCILE_QUEUED_BATCH)) {
-      if (job.kind === ClipJobKind.IMPORT && job.startedAt === null) {
-        orgs.add(job.organizationId);
-        continue;
-      }
-      // Module 11: an export waiting for its turn is the render queue's, below.
-      if (isQueuedRender(job) && job.startedAt === null) continue;
+      // Module 15: waiting for its turn is the scheduler's (the pass below), never restarted here.
+      if (isWaitingTurn(job)) continue;
       const state = await this.scheduling.describeClipJob(job.id);
       if (state === 'unavailable') {
         reachable = false;
@@ -106,13 +128,21 @@ export class ClipReconcileService {
       if (state === 'running') continue;
       if (state === 'closed' || state === 'timedOut') {
         if (await this.failJob(job, now, state === 'timedOut')) failed += 1;
-        orgs.add(job.organizationId);
         continue;
       }
-      // Never started: an IMPORT or an export queues again for its slot, the rest start now.
-      if (job.kind === ClipJobKind.IMPORT || isQueuedRender(job)) {
+      // Sprint 13, Module 15: a paid AI job is never started without its charge (a row can
+      // outlive a refused or lost charge). It fails instead; nothing is held, nothing is given.
+      if (PAID_AI_KINDS.has(job.kind) && (await liveChargeFor(job.organizationId, job.id)) <= 0) {
+        this.logger.warn(
+          JSON.stringify({ event: 'clips.reconcile.uncharged', jobId: job.id, kind: job.kind }),
+        );
+        if (await this.failJob(job, now)) failed += 1;
+        continue;
+      }
+      // Never started: a claimed job gives its slot back and waits for its turn again (the
+      // pass below may hand it the next one); a Preview Export, outside the queue, starts now.
+      if (schedulerClassOf(job) !== null) {
         await this.repository.releaseClaim(job.organizationId, job.id);
-        orgs.add(job.organizationId);
         continue;
       }
       if (await this.jobs.restart(job)) {
@@ -121,6 +151,17 @@ export class ClipReconcileService {
         reachable = false;
         break;
       }
+    }
+
+    // Waiting paid AI jobs whose charge never landed: the scheduler never starts them, so they
+    // would wait for ever. Never handed to Temporal, so this needs no answer from it.
+    for (const job of await this.repository.staleWaitingPaid(before, RECONCILE_UNCHARGED_BATCH)) {
+      if (!isWaitingTurn(job) || !PAID_AI_KINDS.has(job.kind)) continue;
+      if ((await liveChargeFor(job.organizationId, job.id)) > 0) continue;
+      this.logger.warn(
+        JSON.stringify({ event: 'clips.reconcile.uncharged', jobId: job.id, kind: job.kind }),
+      );
+      if (await this.failJob(job, now)) failed += 1;
     }
 
     if (reachable) {
@@ -132,27 +173,11 @@ export class ClipReconcileService {
         }
         if (state === 'running') continue;
         if (await this.failJob(job, now, state === 'timedOut')) failed += 1;
-        orgs.add(job.organizationId);
       }
     }
 
-    if (reachable) {
-      for (const orgId of orgs) {
-        try {
-          started += (await this.jobs.startWaiting(orgId)).length;
-        } catch (error) {
-          this.logger.warn(
-            JSON.stringify({
-              event: 'clips.reconcile.start_waiting_failed',
-              orgId,
-              reason: error instanceof Error ? error.message : String(error),
-            }),
-          );
-        }
-      }
-      // Module 11: the fair render queue looks across every workspace at once.
-      started += (await this.jobs.startRendersQuietly('reconcile')).length;
-    }
+    // Module 15: one scheduler pass across every class and workspace (it never throws).
+    if (reachable) started += (await this.jobs.startNext('reconcile')).length;
 
     if (this.batchNotices) {
       try {
@@ -166,6 +191,9 @@ export class ClipReconcileService {
         );
       }
     }
+
+    // Module 15: a cost a lost `settled` call never wrote, for the last week (never throws).
+    await this.costs?.recordMissing(new Date(now.getTime() - COST_MEND_WINDOW_MS));
 
     if (started > 0 || failed > 0 || !reachable) {
       this.logger.log(JSON.stringify({ event: 'clips.reconcile', started, failed, reachable }));

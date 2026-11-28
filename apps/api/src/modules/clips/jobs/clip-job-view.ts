@@ -22,17 +22,35 @@ import {
 } from '@postgear/video-engine';
 import { z } from 'zod';
 
+/**
+ * A queued job's place in the queue (Sprint 13, Module 15), while it waits
+ * for its turn: QUEUED and not yet claimed by the scheduler.
+ */
+export interface ClipJobWaiting {
+  /** Seconds until its turn, in whole minutes (0: less than a minute), or null when there is no honest number. */
+  aboutSeconds: number | null;
+  /** Jobs that start before it (0: it is next). */
+  position: number;
+  /** The job's own priority is `low` (copied from the plan when it was made). */
+  lowPriority: boolean;
+}
+
 export interface ClipJobView {
   id: string;
   kind: ClipJobKind;
   status: ClipJob['status'];
   stage: string | null;
-  /** In words: the step while running, "Waiting for its turn" while queued, "Done", "Failed" or "Cancelled" once over. */
+  /** In words: the step while running, "Waiting for our turn" while queued, "Done", "Failed" or "Cancelled" once over. */
   stageLabel: string;
   /** 0 to 100. */
   progress: number;
   /** Seconds left, or null when there is no honest answer yet. */
   etaSeconds: number | null;
+  /**
+   * Module 15: only while QUEUED and not yet claimed; null otherwise, and
+   * from every route but `GET /clips/jobs/:jobId` and the live stream.
+   */
+  waiting: ClipJobWaiting | null;
   videoId: string | null;
   clipId: string | null;
   error: ClipError | null;
@@ -168,9 +186,17 @@ function isProof(job: Pick<ClipJob, 'kind' | 'input'>): boolean {
   return (job.input as { proof?: unknown }).proof === true;
 }
 
+/** Whether the job is waiting for its turn: QUEUED, not claimed by a pass, and not a Preview Export. */
+export function isWaitingTurn(
+  job: Pick<ClipJob, 'kind' | 'status' | 'startedAt' | 'input'>,
+): boolean {
+  return job.status === 'QUEUED' && job.startedAt === null && !isProof(job);
+}
+
 export function toJobView(
   job: ClipJob,
   eta: { samples: readonly ProgressSample[]; priorSeconds: number | null } | null = null,
+  waiting: ClipJobWaiting | null = null,
 ): ClipJobView {
   const running = job.status === 'RUNNING';
   const stage = stageOf(job.kind, job.stage);
@@ -182,13 +208,14 @@ export function toJobView(
     stageLabel: jobLabel(job.kind, job.status, stage, { proof: isProof(job) }),
     progress: Math.max(0, Math.min(100, Math.round(job.progress))),
     etaSeconds: running && eta ? estimateEtaSeconds(eta.samples, eta.priorSeconds) : null,
+    waiting: waiting && isWaitingTurn(job) ? waiting : null,
     videoId: job.videoId,
     clipId: job.clipId,
     error: job.status === 'FAILED' || job.status === 'CANCELLED' ? errorOf(job.error) : null,
     result: job.status === 'DONE' ? resultOf(job.kind, job.output) : null,
     createdAt: job.createdAt.toISOString(),
-    // On a QUEUED import, `startedAt` is the claim on an import slot (see
-    // `claimWaitingImports`), not a start: the view says it has not started.
+    // On a QUEUED job, `startedAt` is the scheduler's claim on a slot (see
+    // `claimNext`), not a start: the view says it has not started.
     startedAt: job.status === 'QUEUED' ? null : (job.startedAt?.toISOString() ?? null),
     finishedAt: job.finishedAt?.toISOString() ?? null,
   };

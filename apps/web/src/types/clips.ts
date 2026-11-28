@@ -56,13 +56,25 @@ export type {
   WaveformMeta,
 } from '@postgear/video-engine';
 
+/**
+ * Sprint 13, Module 15: where a job waiting for its turn stands. `position`
+ * is how many jobs of its class go before it; `aboutSeconds` is whole
+ * minutes, or null when there is no honest answer; `lowPriority` is the
+ * job's own priority (`low`), never read from the plan here.
+ */
+export interface ClipJobWaiting {
+  aboutSeconds: number | null;
+  position: number;
+  lowPriority: boolean;
+}
+
 /** `GET /clips/jobs/:jobId` and every job event: never a storage key or a tool's text. */
 export interface ClipJobView {
   id: string;
   kind: ClipJobKind;
   status: ClipJobStatus;
   stage: string | null;
-  /** In words: the step while running, "Waiting for its turn" while queued, "Done", "Failed" or "Cancelled" once over. */
+  /** In words: the step while running, "Waiting for our turn" while queued, "Done", "Failed" or "Cancelled" once over. */
   stageLabel: string;
   /** 0 to 100. */
   progress: number;
@@ -75,6 +87,11 @@ export interface ClipJobView {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * Module 15: set only while QUEUED and not yet given a slot (the job page
+   * and the live streams fill it; every other answer sends null).
+   */
+  waiting: ClipJobWaiting | null;
 }
 
 /** Module 18: a download row's state (see `toDownloadView` in the API). */
@@ -375,6 +392,19 @@ export interface ClipsAiStatus {
   faces?: boolean;
   /** Module 09: Text To Speech is switched on (`CLIPS_TTS`) and can run right now. */
   voice?: boolean;
+  /** Module 15: whether long speech goes to a hosted listener (absent on an older API: read as off). */
+  hostedLane?: ClipsHostedLane;
+}
+
+/** Module 15: `ai.hostedLane`, where long speech is sent to be turned into text. */
+export interface ClipsHostedLane {
+  on: boolean;
+  /** Such as `groq`; null when off. */
+  provider: string | null;
+  /** For a sentence, such as `Groq`; null when off. */
+  providerName: string | null;
+  /** Jobs asking for more minutes of sound than this go there (0: every job); null when off. */
+  aboveMinutes: number | null;
 }
 
 /** Module 09: one voice `GET /clips/voices` offers. */

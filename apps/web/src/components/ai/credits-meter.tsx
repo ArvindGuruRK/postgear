@@ -10,7 +10,7 @@
  * owner asked for the bar back the same day, violet even when nearly spent.
  *
  * `CreditsChip` is the compact form beside a button that spends credits (the
- * SEO analyze bar): "62 of 100 credits left", red and "Running low." once
+ * SEO analyze bar): "62 of 100 AI credits left", red and "Running low." once
  * the API calls the balance low.
  *
  * The reset date is formatted in the viewer's locale, which the server does
@@ -169,7 +169,7 @@ export function CreditsChip({
         )}
       >
         <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
-        {credits.remaining} of {credits.allowance} credits left
+        {credits.remaining} of {credits.allowance} AI credits left
       </span>
       {/* User story 5.5's warning, in words: the red fill alone is colour only. */}
       {credits.low ? <span className="font-bold text-dangerInk">Running low.</span> : null}

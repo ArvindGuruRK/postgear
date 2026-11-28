@@ -5,18 +5,20 @@
  */
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { ClipJob } from '@postgear/db';
+import { clipErrorMessage } from '@postgear/video-engine';
 import type { PrivateStorage } from '@postgear/storage';
 import type { UsageService } from '../../entitlements/usage.service';
 import type { MediaService } from '../../media/media.service';
 import type { NotificationsService } from '../../notifications/notifications.service';
 import type { ClipWorkflowState, SchedulingService } from '../../scheduling/scheduling.service';
 import type { ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
+import type { ClipCostService } from '../costs/clip-cost.service';
 import type { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import type { ClipRecipeApplierService } from '../recipes/clip-recipe-applier.service';
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
-import { ClipReconcileService, lostJobCode } from './clip-reconcile.service';
+import { ClipReconcileService, lostJobCode, PAID_AI_KINDS } from './clip-reconcile.service';
 import { ClipsInternalService } from './clips-internal.service';
 
 const JOB_ID = '33333333-3333-4333-8333-333333333333';
@@ -113,6 +115,12 @@ jest.mock('@postgear/db', () => ({
 
 /** One transaction at a time, as Postgres orders two conflicting serializable ones. */
 let chain: Promise<unknown> = Promise.resolve();
+/** Module 15: the AI minutes standing on each paid job, as `liveChargeFor` reads them. */
+const mockCharges = new Map<string, number>();
+jest.mock('../clips-ai-charges', () => ({
+  liveChargeFor: jest.fn(async (_orgId: string, jobId: string) => mockCharges.get(jobId) ?? 0),
+}));
+
 jest.mock('../clips.tx', () => ({
   serializable: (work: (client: unknown) => Promise<unknown>) => {
     const run = chain.then(() => work(fakePrisma));
@@ -127,6 +135,9 @@ function deps() {
     restart: jest.fn(async () => true),
     // Sprint 13, Module 11: the fair render queue.
     startRendersQuietly: jest.fn(async (): Promise<string[]> => []),
+    // Sprint 13, Module 15: the one scheduler's pass, and the pace of a finished job.
+    startNext: jest.fn(async (): Promise<string[]> => ['started-1']),
+    recordDuration: jest.fn(async () => undefined),
   };
   const jobsRepository = {
     find: jest.fn(
@@ -135,6 +146,12 @@ function deps() {
     ),
     staleQueued: jest.fn(async () => db.jobs.filter((job) => job.status === 'QUEUED')),
     staleRunning: jest.fn(async () => db.jobs.filter((job) => job.status === 'RUNNING')),
+    // Module 15: paid AI jobs still waiting for their turn (every one counts as old here).
+    staleWaitingPaid: jest.fn(async () =>
+      db.jobs.filter(
+        (job) => job.status === 'QUEUED' && job.startedAt === null && PAID_AI_KINDS.has(job.kind),
+      ),
+    ),
     releaseClaim: jest.fn(async () => undefined),
     failOpen: jest.fn(async (jobId: string, error: unknown) => {
       const job = db.jobs.find(
@@ -182,6 +199,10 @@ function deps() {
     settleJob: jest.fn(async () => false),
     sweep: jest.fn(async () => 0),
   };
+  const costs = {
+    record: jest.fn(async () => undefined),
+    recordMissing: jest.fn(async () => 0),
+  };
 
   const internal = new ClipsInternalService(
     jobs as unknown as ClipJobsService,
@@ -192,6 +213,7 @@ function deps() {
     notifications as unknown as NotificationsService,
     applier as unknown as ClipRecipeApplierService,
     batchNotices as unknown as ClipBatchNoticeService,
+    costs as unknown as ClipCostService,
   );
   const reconciler = new ClipReconcileService(
     jobs as unknown as ClipJobsService,
@@ -201,8 +223,10 @@ function deps() {
     notifications as unknown as NotificationsService,
     storage as unknown as PrivateStorage,
     batchNotices as unknown as ClipBatchNoticeService,
+    costs as unknown as ClipCostService,
   );
   return {
+    costs,
     internal,
     reconciler,
     jobs,
@@ -233,6 +257,7 @@ const FINISH = {
 };
 
 beforeEach(() => {
+  mockCharges.clear();
   db.jobs = [];
   db.entries = [];
   db.videos = [];
@@ -377,8 +402,8 @@ describe('ClipsInternalService.finishExport', () => {
 });
 
 describe('ClipsInternalService.settled', () => {
-  it('starts waiting imports and exports, and settles the batch of the job that ended (Module 11)', async () => {
-    const { internal, jobs, batchNotices } = deps();
+  it('times the job, starts the next ones of every class, and settles its batch (Modules 11, 15)', async () => {
+    const { internal, jobs, batchNotices, costs } = deps();
     db.jobs.push(
       jobRow({
         id: JOB_ID,
@@ -388,14 +413,30 @@ describe('ClipsInternalService.settled', () => {
         input: { proof: false, batchId: BATCH_ID },
       }),
     );
-    jobs.startRendersQuietly.mockResolvedValue(['next-export']);
+    jobs.startNext.mockResolvedValue(['next-export', 'next-import']);
 
     await expect(internal.settled(JOB_ID, { organizationId: TEST_ORG })).resolves.toEqual({
       started: 2,
     });
-    expect(jobs.startWaiting).toHaveBeenCalledWith(TEST_ORG);
-    expect(jobs.startRendersQuietly).toHaveBeenCalledWith(TEST_ORG);
+    expect(jobs.recordDuration).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_ID }));
+    // Module 15: the job's cost is written once it has ended.
+    expect(costs.record).toHaveBeenCalledWith(TEST_ORG, JOB_ID);
+    expect(jobs.startNext).toHaveBeenCalledWith(TEST_ORG);
+    // One pass for every class: the Module 11 calls are gone.
+    expect(jobs.startWaiting).not.toHaveBeenCalled();
+    expect(jobs.startRendersQuietly).not.toHaveBeenCalled();
     expect(batchNotices.settleJob).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_ID }));
+  });
+
+  it("refuses another workspace's job before timing or starting anything", async () => {
+    const { internal, jobs, costs } = deps();
+    db.jobs.push(jobRow({ id: JOB_ID, status: 'DONE' }));
+    await expect(internal.settled(JOB_ID, { organizationId: 'other-org' })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(jobs.recordDuration).not.toHaveBeenCalled();
+    expect(costs.record).not.toHaveBeenCalled();
+    expect(jobs.startNext).not.toHaveBeenCalled();
   });
 });
 
@@ -574,6 +615,13 @@ describe('ClipsInternalService.autoEdit and applyRecipe', () => {
 });
 
 describe('ClipReconcileService', () => {
+  it('mends the cost of jobs whose settled call was lost, for the last week (Module 15)', async () => {
+    const { reconciler, costs } = deps();
+    const now = new Date('2026-11-28T12:00:00Z');
+    await reconciler.reconcile(now);
+    expect(costs.recordMissing).toHaveBeenCalledWith(new Date('2026-11-21T12:00:00Z'));
+  });
+
   it('changes nothing while Temporal cannot be reached', async () => {
     const { reconciler, scheduling, jobsRepository, jobs } = deps();
     db.jobs.push(jobRow({ id: JOB_ID, status: 'RUNNING' }));
@@ -581,7 +629,7 @@ describe('ClipReconcileService', () => {
 
     await expect(reconciler.reconcile()).resolves.toEqual({ started: 0, failed: 0 });
     expect(jobsRepository.failOpen).not.toHaveBeenCalled();
-    expect(jobs.startWaiting).not.toHaveBeenCalled();
+    expect(jobs.startNext).not.toHaveBeenCalled();
   });
 
   it('fails a running import whose workflow is gone: charge back, video failed, bell rung', async () => {
@@ -620,8 +668,9 @@ describe('ClipReconcileService', () => {
   });
 
   it('leaves a quiet job alone while its workflow still runs', async () => {
-    const { reconciler, jobsRepository } = deps();
+    const { reconciler, jobsRepository, jobs } = deps();
     db.jobs.push(jobRow({ id: JOB_ID, status: 'RUNNING' }));
+    jobs.startNext.mockResolvedValue([]);
     await expect(reconciler.reconcile()).resolves.toEqual({ started: 0, failed: 0 });
     expect(jobsRepository.failOpen).not.toHaveBeenCalled();
   });
@@ -644,7 +693,9 @@ describe('ClipReconcileService', () => {
 
     const answer = await reconciler.reconcile();
     expect(jobs.restart).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_ID }));
-    expect(jobs.startWaiting).toHaveBeenCalledWith(TEST_ORG);
+    // The waiting import is the scheduler's: never looked up, started by the one pass.
+    expect(scheduling.describeClipJob).toHaveBeenCalledTimes(1);
+    expect(jobs.startNext).toHaveBeenCalledWith('reconcile');
     expect(answer.started).toBe(2);
   });
 
@@ -670,8 +721,7 @@ describe('ClipReconcileService', () => {
       }),
     );
     scheduling.describeClipJob.mockResolvedValue('notFound');
-    jobs.startRendersQuietly.mockResolvedValue(['claimed-export']);
-    jobs.startWaiting.mockResolvedValue([]);
+    jobs.startNext.mockResolvedValue(['claimed-export']);
 
     const answer = await reconciler.reconcile(NOW);
     // The waiting one was never looked up in Temporal: it has not had its turn yet.
@@ -679,9 +729,33 @@ describe('ClipReconcileService', () => {
     expect(scheduling.describeClipJob).toHaveBeenCalledWith('claimed-export');
     expect(jobsRepository.releaseClaim).toHaveBeenCalledWith(TEST_ORG, 'claimed-export');
     expect(jobs.restart).not.toHaveBeenCalled();
-    expect(jobs.startRendersQuietly).toHaveBeenCalledTimes(1);
+    expect(jobs.startNext).toHaveBeenCalledTimes(1);
     expect(batchNotices.sweep).toHaveBeenCalledWith(NOW);
     expect(answer.started).toBe(1);
+  });
+
+  it('gives back the lost claim of any kind, never restarting it past the queue (Module 15)', async () => {
+    const { reconciler, scheduling, jobs, jobsRepository } = deps();
+    const NOW = new Date('2026-11-28T12:00:00.000Z');
+    for (const [id, kind] of [
+      ['claimed-import', 'IMPORT'],
+      ['claimed-segment', 'SEGMENT'],
+      ['claimed-faces', 'FACES'],
+    ] as const) {
+      db.jobs.push(jobRow({ id, kind, status: 'QUEUED', startedAt: NOW }));
+    }
+    db.jobs.push(jobRow({ id: 'waiting-emote', kind: 'EMOTE', status: 'QUEUED', startedAt: null }));
+    scheduling.describeClipJob.mockResolvedValue('notFound');
+    jobs.startNext.mockResolvedValue([]);
+
+    await expect(reconciler.reconcile(NOW)).resolves.toEqual({ started: 0, failed: 0 });
+    expect(jobsRepository.releaseClaim.mock.calls.map((call) => (call as unknown[])[1])).toEqual([
+      'claimed-import',
+      'claimed-segment',
+      'claimed-faces',
+    ]);
+    expect(scheduling.describeClipJob).not.toHaveBeenCalledWith('waiting-emote');
+    expect(jobs.restart).not.toHaveBeenCalled();
   });
 
   it("fails a lost export of a batch without the clip's own bell, and settles the batch (Module 11)", async () => {
@@ -700,6 +774,34 @@ describe('ClipReconcileService', () => {
     expect((await reconciler.reconcile()).failed).toBe(1);
     expect(notifications.notify).not.toHaveBeenCalled();
     expect(batchNotices.settleJob).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_ID }));
+  });
+
+  it('fails a waiting paid AI job whose charge never landed, even with Temporal out of reach (Module 15)', async () => {
+    const { reconciler, scheduling, jobs, usage } = deps();
+    const NOW = new Date('2026-11-28T12:00:00.000Z');
+    db.jobs.push(
+      jobRow({ id: 'uncharged-voice', kind: 'SPEECH', status: 'QUEUED', startedAt: null }),
+      jobRow({ id: 'charged-listen', kind: 'TRANSCRIBE', status: 'QUEUED', startedAt: null }),
+      jobRow({ id: 'waiting-faces', kind: 'FACES', status: 'QUEUED', startedAt: null }),
+      jobRow({ id: 'claimed-import', kind: 'IMPORT', status: 'QUEUED', startedAt: NOW }),
+    );
+    mockCharges.set('charged-listen', 4_000);
+    scheduling.describeClipJob.mockResolvedValue('unavailable');
+
+    await expect(reconciler.reconcile(NOW)).resolves.toEqual({ started: 0, failed: 1 });
+    const statusOf = (id: string) => db.jobs.find((job) => job.id === id)?.status;
+    expect(db.jobs.find((job) => job.id === 'uncharged-voice')?.error).toEqual({
+      code: 'tool_failed',
+      message: clipErrorMessage('tool_failed'),
+    });
+    expect(statusOf('uncharged-voice')).toBe('FAILED');
+    // Charged, or free: the scheduler's to start when their turn comes.
+    expect(statusOf('charged-listen')).toBe('QUEUED');
+    expect(statusOf('waiting-faces')).toBe('QUEUED');
+    expect(usage.reverseAllFor).toHaveBeenCalledWith(TEST_ORG, 'uncharged-voice');
+    // Temporal never answered: the claimed one is left and no pass runs.
+    expect(statusOf('claimed-import')).toBe('QUEUED');
+    expect(jobs.startNext).not.toHaveBeenCalled();
   });
 
   it('names the failure by kind', () => {

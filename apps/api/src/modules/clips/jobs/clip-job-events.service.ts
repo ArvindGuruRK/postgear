@@ -22,13 +22,24 @@
  * while it changes, then that job's `done`, `failed` or `cancelled`. The
  * stream stays open until every job has sent its last event (a job that is
  * gone, or another workspace's, is dropped silently), then closes.
+ *
+ * Sprint 13, Module 15: a job waiting for its turn carries `waiting` (its
+ * place in the queue and about how long), asked again every
+ * `WAITING_REFRESH_MS`; a change in it is a change worth a `progress` event.
  */
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { ClipJob } from '@postgear/db';
 import type { ProgressSample } from '@postgear/video-engine';
 import type { SseStream } from '../../../common/sse';
 import { CLIPS_MESSAGES } from '../clips.messages';
-import { median, TERMINAL_JOB_STATUSES, toJobView } from './clip-job-view';
+import {
+  type ClipJobView,
+  type ClipJobWaiting,
+  isWaitingTurn,
+  median,
+  TERMINAL_JOB_STATUSES,
+  toJobView,
+} from './clip-job-view';
 import { ClipJobsRepository } from './clip-jobs.repository';
 import { ClipJobsService } from './clip-jobs.service';
 
@@ -36,6 +47,8 @@ export const JOB_EVENTS_POLL_MS = 750;
 export const JOB_EVENTS_MAX_MS = 30 * 60_000;
 /** Samples older than this are dropped; the estimate only reads the last minute. */
 const SAMPLE_KEEP_MS = 90_000;
+/** How often a waiting job's place in the queue is asked again (the queue itself is read every 5 s). */
+export const WAITING_REFRESH_MS = 5_000;
 
 export interface JobEventsClock {
   now(): number;
@@ -71,6 +84,7 @@ export class ClipJobEventsService {
     const samples: ProgressSample[] = [];
     let priorSeconds: number | null | undefined;
     let last = '';
+    let waiting: { at: number; value: ClipJobWaiting | null } | null = null;
 
     try {
       while (!stream.closed) {
@@ -94,7 +108,18 @@ export class ClipJobEventsService {
           }
         }
 
-        const view = toJobView(job, { samples, priorSeconds: priorSeconds ?? null });
+        if (isWaitingTurn(job)) {
+          const now = this.clock.now();
+          if (!waiting || now - waiting.at >= WAITING_REFRESH_MS) {
+            waiting = { at: now, value: (await this.jobs.waitingFor([job])).get(job.id) ?? null };
+          }
+        }
+
+        const view = toJobView(
+          job,
+          { samples, priorSeconds: priorSeconds ?? null },
+          waiting?.value ?? null,
+        );
 
         if (TERMINAL_JOB_STATUSES.has(job.status)) {
           stream.send(
@@ -104,7 +129,7 @@ export class ClipJobEventsService {
           return;
         }
 
-        const fingerprint = `${view.status}|${view.stage}|${view.progress}|${view.etaSeconds}`;
+        const fingerprint = fingerprintOf(view);
         if (fingerprint !== last) {
           stream.send('progress', view);
           last = fingerprint;
@@ -135,6 +160,7 @@ export class ClipJobEventsService {
       [...new Set(jobIds)].map((id) => [id, { samples: [], last: '', ended: false }]),
     );
     const priors = new Map<ClipJob['kind'], number | null>();
+    let waiting: { at: number; values: Map<string, ClipJobWaiting> } | null = null;
 
     try {
       while (!stream.closed) {
@@ -143,6 +169,14 @@ export class ClipJobEventsService {
         const rows = new Map(
           (await this.repository.findMany(orgId, open)).map((job) => [job.id, job]),
         );
+        const now = this.clock.now();
+        const queued = [...rows.values()].filter(isWaitingTurn);
+        if (queued.length === 0) {
+          waiting = null;
+        } else if (!waiting || now - waiting.at >= WAITING_REFRESH_MS) {
+          // One look at the queue for every waiting job of the batch.
+          waiting = { at: now, values: await this.jobs.waitingFor(queued) };
+        }
 
         for (const id of open) {
           const state = watched.get(id) as Watched;
@@ -169,10 +203,11 @@ export class ClipJobEventsService {
             }
           }
 
-          const view = toJobView(job, {
-            samples: state.samples,
-            priorSeconds: priors.get(job.kind) ?? null,
-          });
+          const view = toJobView(
+            job,
+            { samples: state.samples, priorSeconds: priors.get(job.kind) ?? null },
+            waiting?.values.get(job.id) ?? null,
+          );
 
           if (TERMINAL_JOB_STATUSES.has(job.status)) {
             stream.send(
@@ -183,7 +218,7 @@ export class ClipJobEventsService {
             continue;
           }
 
-          const fingerprint = `${view.status}|${view.stage}|${view.progress}|${view.etaSeconds}`;
+          const fingerprint = fingerprintOf(view);
           if (fingerprint !== state.last) {
             stream.send('progress', view);
             state.last = fingerprint;
@@ -211,6 +246,14 @@ interface Watched {
   samples: ProgressSample[];
   last: string;
   ended: boolean;
+}
+
+/** What changes a view enough to send it again. */
+function fingerprintOf(view: ClipJobView): string {
+  const waiting = view.waiting
+    ? `${view.waiting.position}|${view.waiting.aboutSeconds}|${view.waiting.lowPriority}`
+    : '-';
+  return `${view.status}|${view.stage}|${view.progress}|${view.etaSeconds}|${waiting}`;
 }
 
 function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {

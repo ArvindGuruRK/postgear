@@ -361,7 +361,9 @@ export class ClipExportsService {
     const done = job.status === 'DONE' && job.finishedAt !== null;
     const expiresAt = done ? new Date((job.finishedAt as Date).getTime() + PREVIEW_KEEP_MS) : null;
     const proofKey = done ? (outputOf(job)?.proofKey ?? null) : null;
-    const kept = expiresAt !== null && now.getTime() < expiresAt.getTime();
+    // Module 15: a clip marked removed with a video it plays (a montage whose
+    // first video is another one keeps its own row) never signs its preview again.
+    const kept = expiresAt !== null && now.getTime() < expiresAt.getTime() && !clip.removedAt;
     return {
       preview: {
         job: toJobView(job),
@@ -377,7 +379,7 @@ export class ClipExportsService {
     const clip = isUuid(clipId)
       ? await prisma.clip.findFirst({
           where: { id: clipId, organizationId: orgId },
-          select: { id: true },
+          select: { id: true, removedAt: true },
         })
       : null;
     if (!clip) throw clipNotFound();

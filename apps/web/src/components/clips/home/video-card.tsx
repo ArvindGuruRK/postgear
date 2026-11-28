@@ -7,7 +7,9 @@
  *   3 h 42 min, 12 clips", "Kept until 28 Nov", Open and the menu.
  * - **Coming in**: the poster area is `bg-inset` with a `Progress`, the step
  *   in words and, once the job can tell, "About 4 minutes left"; Cancel. A
- *   job waiting for a slot says "Waiting for its turn". The card follows its
+ *   job waiting for a slot says "Waiting for our turn" with its time when
+ *   the API can tell, and "Plans with a higher priority go first." under it
+ *   for a low priority job (Sprint 13, Module 15). The card follows its
  *   job live (`useClipJob`) and asks for its own row again when the job ends.
  * - **Failed**: an `Alert variant="danger"` with the reason and Try Again.
  *
@@ -53,6 +55,7 @@ import type { ClipJobView, ClipVideoCard } from '@/types/clips';
 import { PrimaryLink } from '../button-link';
 import { isTerminalJob } from '../clip-job-model';
 import { useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
 import { AutoEditDialog } from '../video/auto-edit-dialog';
 import {
   deleteVideoSentence,
@@ -199,6 +202,7 @@ export function VideoCard({
               <span className="tabular-nums">{percent}%</span>
               {eta ? <span>{eta}</span> : null}
             </span>
+            <WaitingNote job={job} />
           </div>
         ) : null}
         {video.status === 'FAILED' ? (

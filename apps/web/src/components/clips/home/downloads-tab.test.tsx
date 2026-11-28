@@ -82,7 +82,10 @@ describe('preparingLine and shownState', () => {
   it('says how far it is, and only words before a number', () => {
     expect(preparingLine(40.4, false)).toBe('Getting your file, 40%');
     expect(preparingLine(0, false)).toBe('Getting your file');
-    expect(preparingLine(10, true)).toBe('Waiting for its turn');
+    expect(preparingLine(10, true)).toBe('Waiting for our turn');
+    expect(preparingLine(0, true, { aboutSeconds: 60, position: 0, lowPriority: true })).toBe(
+      'Waiting for our turn, about 1 minute',
+    );
   });
 
   it('turns a ready file Expired once its time is over, by the page clock', () => {

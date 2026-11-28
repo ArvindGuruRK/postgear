@@ -49,7 +49,12 @@ import { gigabytesToBytes } from '../clips.units';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { ClipDrive, type ClipDriveStatus } from '../videos/clip-drive';
 import { ClipSampleLink } from '../videos/clip-sample';
-import { type AiServiceState, MediaServiceProbe } from './media-service.probe';
+import {
+  type AiServiceState,
+  type HostedLaneState,
+  MediaServiceProbe,
+  NO_HOSTED_LANE,
+} from './media-service.probe';
 import { MediaVoices } from './media-voices.client';
 
 const ANSWER_CACHE_MS = 60_000;
@@ -154,6 +159,14 @@ export interface ClipsAiStatus {
    * Effects tab's voice row.
    */
   voice: boolean;
+  /**
+   * Module 15: whether long speech is sent to a hosted listener to be turned
+   * into text (`TRANSCRIBER=auto` or `groq` with its key, on the media
+   * service), which one, and above how many minutes a job (0: every job).
+   * Off while the service is off or simulating. The privacy text names the
+   * provider only while this is on.
+   */
+  hostedLane: HostedLaneState;
 }
 
 /** Module 19: what the video space holds. */
@@ -196,14 +209,17 @@ export class ClipsStatusService {
 
   async status(orgId: string): Promise<ClipsStatus> {
     const now = new Date();
-    const [tools, byKind, values, importMinutes, aiMinutes, aiService] = await Promise.all([
-      this.tools(),
-      this.limits.storageByKind(orgId),
-      this.resolver.getMany(orgId, CLIPS_STATUS_LIMIT_KEYS, now),
-      this.resolver.meter(orgId, IMPORT_MINUTES, now),
-      this.resolver.meter(orgId, AI_MINUTES, now),
-      this.mediaService.state(),
-    ]);
+    const [tools, byKind, values, importMinutes, aiMinutes, aiService, hostedLane] =
+      await Promise.all([
+        this.tools(),
+        this.limits.storageByKind(orgId),
+        this.resolver.getMany(orgId, CLIPS_STATUS_LIMIT_KEYS, now),
+        this.resolver.meter(orgId, IMPORT_MINUTES, now),
+        this.resolver.meter(orgId, AI_MINUTES, now),
+        this.mediaService.state(),
+        // The same cached `/ready` answer as `state()`: one request for both.
+        this.mediaService.hostedLane(),
+      ]);
     const limits = Object.fromEntries(
       CLIPS_STATUS_LIMIT_KEYS.map((key) => [key, values[key]]),
     ) as ClipsStatusLimits;
@@ -241,6 +257,7 @@ export class ClipsStatusService {
         actionVision: this.actionVision,
         faces: aiService === 'ok',
         voice,
+        hostedLane: aiService === 'ok' ? hostedLane : NO_HOSTED_LANE,
       },
     };
   }

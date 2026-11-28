@@ -1,9 +1,10 @@
 /**
  * `ClipJob` rows (Sprint 12, Module 02). Every read and write is scoped to
- * the workspace: an id from the URL is never enough on its own. The two
- * exceptions are the queue claims below (`claimWaitingRenders` and the
- * reconcile's lists), which look across workspaces on purpose: turns are
- * shared between them.
+ * the workspace: an id from the URL is never enough on its own. The
+ * exceptions are the scheduler's claim and the estimate's reads (Sprint 13,
+ * Module 15: `claimNext`, `queueSnapshot`, `inputsOf`, `lengths`) and the
+ * reconcile's lists, which look across workspaces on purpose: slots and
+ * turns are shared between them.
  */
 import { Injectable } from '@nestjs/common';
 import {
@@ -14,8 +15,19 @@ import {
   type Prisma,
   prisma,
 } from '@postgear/db';
-import { JOB_PRIORITIES, priorityRank } from '@postgear/video-engine';
 import { type ClipsTx, serializable } from '../clips.tx';
+import {
+  CLASS_KINDS,
+  type HeldJob,
+  JOB_CLASSES,
+  nextJobs,
+  PAID_AI_KINDS,
+  SCHEDULER_CLASSES,
+  type SchedulerClass,
+  type SchedulerJob,
+  schedulerClassOf,
+  servedKey,
+} from './clip-scheduler.rules';
 
 /** The statuses a job can still change from. */
 export const OPEN_JOB_STATUSES: readonly ClipJobStatus[] = [
@@ -134,41 +146,69 @@ export class ClipJobsRepository {
   }
 
   /**
-   * Claims the IMPORT jobs that may start now (Module 04, the concurrent
-   * import cap). A slot is held by a RUNNING job or by a QUEUED one already
-   * handed to Temporal (`startedAt` set by this claim; the worker sets it
-   * again when it really starts). The free slots go to the waiting jobs with
-   * the highest priority, then the oldest. Serializable, so two callers at
-   * once (a `settled` call and a new import) can never both fill the last
-   * slot: one is aborted, retried, and sees the other's claim.
+   * Claims the jobs one scheduler pass may start now (Sprint 13, Module 15;
+   * it replaces Module 04's import claim and Module 11's render claim). The
+   * rules are `nextJobs` in `clip-scheduler.rules.ts`; this reads the rows:
+   *
+   * - the jobs holding a slot: RUNNING, or QUEUED and already handed to
+   *   Temporal (`startedAt` set by this claim; the worker sets it again when
+   *   it really starts);
+   * - for each class with a free slot, its waiting jobs (QUEUED, not
+   *   claimed), oldest first;
+   * - each waiting workspace's `clips.concurrent_imports` (`importCap`, read
+   *   through the resolver by the caller) and when it was last served in the
+   *   class.
+   *
+   * A job `mayStart` refuses (a paid AI job whose charge is not standing
+   * yet) is left waiting and the pick is made again without it, so only the
+   * jobs a pick would start are checked, each at most once a pass.
+   *
+   * A Preview Export is never read here: it starts at once and holds no
+   * slot. Serializable, so two passes at once (a `settled` call and a new
+   * job) can never both fill the last slot: one is aborted, retried, and
+   * sees the other's claim.
    */
-  claimWaitingImports(orgId: string, cap: number, now: Date): Promise<ClaimedJob[]> {
+  claimNext(
+    slots: Readonly<Record<SchedulerClass, number>>,
+    importCap: (orgId: string) => Promise<number>,
+    now: Date,
+    mayStart: (job: SchedulerJob) => Promise<boolean>,
+  ): Promise<ClaimedJob[]> {
     return serializable(async (tx) => {
-      const busy = await tx.clipJob.count({
-        where: {
-          organizationId: orgId,
-          kind: ClipJobKind.IMPORT,
-          OR: [
-            { status: ClipJobStatus.RUNNING },
-            { status: ClipJobStatus.QUEUED, startedAt: { not: null } },
-          ],
-        },
-      });
-      const free = Math.max(0, Math.floor(cap) - busy);
-      if (free === 0) return [];
+      const holding = await this.holding(tx);
+      const held = countByClass(holding);
 
-      const waiting = await tx.clipJob.findMany({
-        where: {
-          organizationId: orgId,
-          kind: ClipJobKind.IMPORT,
-          status: ClipJobStatus.QUEUED,
-          startedAt: null,
-        },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        take: WAITING_SCAN_LIMIT,
-        select: { id: true, organizationId: true, kind: true, priority: true, createdAt: true },
-      });
-      const picked = pickNext(waiting, free);
+      const waiting: SchedulerRow[] = [];
+      for (const cls of SCHEDULER_CLASSES) {
+        if (Math.floor(slots[cls]) - (held.get(cls) ?? 0) <= 0) continue;
+        waiting.push(...(await this.waitingIn(tx, cls)));
+      }
+      if (waiting.length === 0) return [];
+
+      const importsPerWorkspace = new Map<string, number>();
+      for (const orgId of new Set(
+        waiting.filter((job) => job.kind === ClipJobKind.IMPORT).map((job) => job.organizationId),
+      )) {
+        importsPerWorkspace.set(orgId, await importCap(orgId));
+      }
+
+      const lastServed = await this.lastServed(tx, waiting);
+      const limits = { slots, importsPerWorkspace, lastServed };
+      const allowed = new Set<string>();
+      let candidates = waiting;
+      let picked = nextJobs(candidates, holding, limits, now);
+      for (;;) {
+        const unchecked = picked.filter((job) => !allowed.has(job.id));
+        if (unchecked.length === 0) break;
+        const refused = new Set<string>();
+        for (const job of unchecked) {
+          if (await mayStart(job)) allowed.add(job.id);
+          else refused.add(job.id);
+        }
+        if (refused.size === 0) break;
+        candidates = candidates.filter((job) => !refused.has(job.id));
+        picked = nextJobs(candidates, holding, limits, now);
+      }
       if (picked.length === 0) return [];
 
       await tx.clipJob.updateMany({
@@ -184,84 +224,140 @@ export class ClipJobsRepository {
   }
 
   /**
-   * Claims the exports that may start now (Sprint 13, Module 11, the fair
-   * render queue). Every export is made QUEUED; this hands out the free
-   * render slots:
-   *
-   * - at most `slots` exports hold a slot across every workspace, and at
-   *   most ONE per workspace. A slot is held by a RUNNING export or by a
-   *   QUEUED one already handed to Temporal (`startedAt` set by this claim,
-   *   as `claimWaitingImports` does);
-   * - each waiting workspace offers its own next export (highest priority,
-   *   then the oldest: `pickNext`); across workspaces the highest `priority`
-   *   goes first (copied from `clips.queue_priority` when the job was made),
-   *   and equal priorities take turns: the workspace served longest ago (or
-   *   never) goes first, so a 30 clip batch never starves a later one.
-   *
-   * Preview Export (`proof: true`) is not queued here: it starts at once and
-   * holds no slot. Serializable, so two callers at once (a `settled` call and
-   * a new export) can never both fill the last slot or start two exports of
-   * one workspace: one is aborted, retried, and sees the other's claim.
+   * One class as the estimate sees it (Module 15): its waiting jobs, the
+   * ones holding a slot with their progress, and the workspaces' last turns.
+   * Read without a transaction: an estimate is about, never a claim.
    */
-  claimWaitingRenders(slots: number, now: Date): Promise<ClaimedJob[]> {
-    return serializable(async (tx) => {
-      const busy = await tx.clipJob.findMany({
+  async queueSnapshot(cls: SchedulerClass): Promise<QueueSnapshot> {
+    const [waiting, holding] = await Promise.all([
+      prisma.clipJob.findMany({
         where: {
-          kind: ClipJobKind.RENDER,
-          input: { path: ['proof'], equals: false },
-          OR: [
-            { status: ClipJobStatus.RUNNING },
-            { status: ClipJobStatus.QUEUED, startedAt: { not: null } },
-          ],
-        },
-        select: { organizationId: true },
-        take: WAITING_SCAN_LIMIT,
-      });
-      const free = Math.max(0, Math.floor(slots) - busy.length);
-      if (free === 0) return [];
-      const busyOrgs = new Set(busy.map((row) => row.organizationId));
-
-      const waiting = await tx.clipJob.findMany({
-        where: {
-          kind: ClipJobKind.RENDER,
           status: ClipJobStatus.QUEUED,
           startedAt: null,
-          input: { path: ['proof'], equals: false },
+          kind: { in: [...CLASS_KINDS[cls]] },
+          NOT: PREVIEW_EXPORT,
         },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         take: WAITING_SCAN_LIMIT,
-        select: { id: true, organizationId: true, kind: true, priority: true, createdAt: true },
-      });
-      const candidates = waiting.filter((job) => !busyOrgs.has(job.organizationId));
-      if (candidates.length === 0) return [];
+        select: QUEUE_ROW_SELECT,
+      }),
+      prisma.clipJob.findMany({
+        where: { ...HOLDING_SLOT, kind: { in: [...CLASS_KINDS[cls]] } },
+        take: WAITING_SCAN_LIMIT,
+        select: { ...QUEUE_ROW_SELECT, status: true, progress: true },
+      }),
+    ]);
+    return {
+      waiting,
+      holding,
+      lastServed: await this.lastServed(prisma, waiting),
+      clipped: waiting.length >= WAITING_SCAN_LIMIT,
+    };
+  }
 
-      const lastServed = new Map<string, Date>();
-      for (const orgId of new Set(candidates.map((job) => job.organizationId))) {
-        const last = await tx.clipJob.findFirst({
-          where: {
-            organizationId: orgId,
-            kind: ClipJobKind.RENDER,
-            startedAt: { not: null },
-            input: { path: ['proof'], equals: false },
-          },
-          orderBy: [{ startedAt: 'desc' }],
-          select: { startedAt: true },
-        });
-        if (last?.startedAt) lastServed.set(orgId, last.startedAt);
-      }
-
-      const picked = pickFairRenders(candidates, lastServed, free, now);
-      if (picked.length === 0) return [];
-      await tx.clipJob.updateMany({
-        where: {
-          id: { in: picked.map((job) => job.id) },
-          status: ClipJobStatus.QUEUED,
-          startedAt: null,
-        },
-        data: { startedAt: now },
-      });
-      return picked.map(({ id, organizationId, kind }) => ({ id, organizationId, kind }));
+  /**
+   * The inputs of the jobs an estimate sizes from their input (every kind
+   * but an import, Find Clips and an export, whose size comes from the video
+   * or the clip row; an export's input holds its whole document).
+   */
+  async inputsOf(jobIds: readonly string[]): Promise<Map<string, unknown>> {
+    if (jobIds.length === 0) return new Map();
+    const rows = await prisma.clipJob.findMany({
+      where: {
+        id: { in: [...jobIds] },
+        NOT: { kind: { in: [ClipJobKind.IMPORT, ClipJobKind.HIGHLIGHTS, ClipJobKind.RENDER] } },
+      },
+      select: { id: true, input: true },
     });
+    return new Map(rows.map((row) => [row.id, row.input]));
+  }
+
+  /**
+   * Lengths of videos and clips named by job rows, in ms (null when not
+   * known yet). Across workspaces on purpose, like the claim: the ids come
+   * from job rows, and only a length is read, checked against the job's own
+   * workspace by the caller.
+   */
+  async lengths(
+    videoIds: readonly string[],
+    clipIds: readonly string[],
+  ): Promise<{
+    videos: Map<string, { organizationId: string; durationMs: number | null }>;
+    clips: Map<string, { organizationId: string; durationMs: number }>;
+  }> {
+    const [videos, clips] = await Promise.all([
+      videoIds.length === 0
+        ? []
+        : prisma.clipVideo.findMany({
+            where: { id: { in: [...new Set(videoIds)] } },
+            select: { id: true, organizationId: true, durationMs: true },
+          }),
+      clipIds.length === 0
+        ? []
+        : prisma.clip.findMany({
+            where: { id: { in: [...new Set(clipIds)] } },
+            select: { id: true, organizationId: true, durationMs: true },
+          }),
+    ]);
+    return {
+      videos: new Map(videos.map(({ id, ...rest }) => [id, rest])),
+      clips: new Map(clips.map(({ id, ...rest }) => [id, rest])),
+    };
+  }
+
+  /** The jobs holding a slot, every class (a Preview Export never holds one). */
+  private holding(tx: ClipsTx): Promise<HeldRow[]> {
+    return tx.clipJob.findMany({
+      where: HOLDING_SLOT,
+      select: { organizationId: true, kind: true },
+      take: WAITING_SCAN_LIMIT,
+    });
+  }
+
+  /** One class's waiting jobs, oldest first. */
+  private waitingIn(tx: ClipsTx, cls: SchedulerClass): Promise<SchedulerRow[]> {
+    return tx.clipJob.findMany({
+      where: {
+        status: ClipJobStatus.QUEUED,
+        startedAt: null,
+        kind: { in: [...CLASS_KINDS[cls]] },
+        NOT: PREVIEW_EXPORT,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: WAITING_SCAN_LIMIT,
+      select: { id: true, organizationId: true, kind: true, priority: true, createdAt: true },
+    });
+  }
+
+  /**
+   * When each waiting workspace last had a job of the class started (the
+   * newest `startedAt`), keyed by `servedKey`. A workspace never served is
+   * left out, which ranks it first among equals.
+   */
+  private async lastServed(
+    tx: ClipsTx,
+    waiting: readonly Pick<SchedulerRow, 'organizationId' | 'kind'>[],
+  ): Promise<Map<string, number>> {
+    const served = new Map<string, number>();
+    const wanted = new Map<string, { cls: SchedulerClass; orgId: string }>();
+    for (const job of waiting) {
+      const cls = JOB_CLASSES[job.kind];
+      if (cls) wanted.set(servedKey(cls, job.organizationId), { cls, orgId: job.organizationId });
+    }
+    for (const [key, { cls, orgId }] of wanted) {
+      const last = await tx.clipJob.findFirst({
+        where: {
+          organizationId: orgId,
+          kind: { in: [...CLASS_KINDS[cls]] },
+          startedAt: { not: null },
+          NOT: PREVIEW_EXPORT,
+        },
+        orderBy: [{ startedAt: 'desc' }],
+        select: { startedAt: true },
+      });
+      if (last?.startedAt) served.set(key, last.startedAt.getTime());
+    }
+    return served;
   }
 
   /**
@@ -310,24 +406,46 @@ export class ClipJobsRepository {
   }
 
   /**
-   * The reconcile's QUEUED candidates in every workspace: made before
-   * `before`, oldest first. Bounded, so one pass stays short.
+   * The reconcile's QUEUED candidates in every workspace, oldest first,
+   * bounded so one pass stays short: the starts that may have been lost.
+   *
+   * - A job a pass claimed before `before` (`startedAt` is the claim) and
+   *   that is still QUEUED.
+   * - A Preview Export made before `before` and never started (it is
+   *   started at once, outside the scheduler).
+   *
+   * A job still waiting for its turn (QUEUED, not claimed) is the
+   * scheduler's, not the reconcile's, and is left out (Module 11's rule for
+   * exports, now for every kind), so a long queue never fills the window
+   * and hides a claimed job whose start was lost.
    */
   staleQueued(before: Date, take: number): Promise<ClipJob[]> {
     return prisma.clipJob.findMany({
       where: {
         status: ClipJobStatus.QUEUED,
+        OR: [
+          { startedAt: { lt: before } },
+          { ...PREVIEW_EXPORT, startedAt: null, createdAt: { lt: before } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+      take,
+    });
+  }
+
+  /**
+   * Paid AI jobs (`PAID_AI_KINDS`) still waiting for their turn that were
+   * made before `before`, oldest first: the reconcile fails the ones whose
+   * charge never landed (Module 15). A list of its own, so a long queue of
+   * charged ones never hides a claimed job whose start was lost.
+   */
+  staleWaitingPaid(before: Date, take: number): Promise<ClipJob[]> {
+    return prisma.clipJob.findMany({
+      where: {
+        status: ClipJobStatus.QUEUED,
+        startedAt: null,
+        kind: { in: [...PAID_AI_KINDS] },
         createdAt: { lt: before },
-        // Module 11: an export still waiting for its turn is the render queue's, not the
-        // reconcile's; left out here so a long batch never fills the window and hides a
-        // claimed export whose start was lost.
-        NOT: {
-          AND: [
-            { kind: ClipJobKind.RENDER },
-            { startedAt: null },
-            { NOT: { input: { path: ['proof'], equals: true } } },
-          ],
-        },
       },
       orderBy: { createdAt: 'asc' },
       take,
@@ -358,11 +476,40 @@ export class ClipJobsRepository {
 }
 
 /**
- * Waiting jobs looked at per claim: far more than any cap, so the priority
+ * Rows looked at per class per claim: far more than any slot count, so the
  * order holds. The global `CLIPS_QUEUE_CEILING` (500 waiting jobs of every
- * kind) keeps the waiting renders under it.
+ * kind) keeps each class under it.
  */
 const WAITING_SCAN_LIMIT = 500;
+
+/** A Preview Export: started at once, outside the scheduler (Module 11). */
+const PREVIEW_EXPORT = {
+  kind: ClipJobKind.RENDER,
+  input: { path: ['proof'], equals: true },
+} satisfies Prisma.ClipJobWhereInput;
+
+/**
+ * A job holding a slot: RUNNING, or QUEUED and claimed by a pass. A Preview
+ * Export never holds one. Every RENDER input has `proof`, so the JSON path
+ * is never missing on a RENDER row (a missing path would read as NULL).
+ */
+const HOLDING_SLOT = {
+  OR: [
+    { status: ClipJobStatus.RUNNING },
+    { status: ClipJobStatus.QUEUED, startedAt: { not: null } },
+  ],
+  NOT: PREVIEW_EXPORT,
+} satisfies Prisma.ClipJobWhereInput;
+
+const QUEUE_ROW_SELECT = {
+  id: true,
+  organizationId: true,
+  kind: true,
+  priority: true,
+  createdAt: true,
+  videoId: true,
+  clipId: true,
+} as const;
 
 export interface ClaimedJob {
   id: string;
@@ -370,70 +517,40 @@ export interface ClaimedJob {
   kind: ClipJobKind;
 }
 
-/** Highest priority first, then the oldest: the order waiting imports start in. */
-export function pickNext<T extends { id: string; priority: string; createdAt: Date }>(
-  waiting: readonly T[],
-  count: number,
-): T[] {
-  if (count <= 0) return [];
-  return [...waiting]
-    .sort(
-      (a, b) =>
-        priorityRank(b.priority) - priorityRank(a.priority) ||
-        a.createdAt.getTime() - b.createdAt.getTime() ||
-        a.id.localeCompare(b.id),
-    )
-    .slice(0, count);
+interface SchedulerRow extends SchedulerJob {
+  kind: ClipJobKind;
 }
 
-/**
- * The fair render order (Module 11): one export per waiting workspace (its
- * own next, by `pickNext`), then across workspaces the highest priority
- * first and, among equals, the workspace served longest ago (never served
- * counts as longest), then the oldest export. Answers at most `count`, never
- * two of one workspace.
- *
- * No workspace starves: every `RENDER_AGING_MS` an export has waited counts
- * as one priority step higher, up to the top one, so a low priority export
- * that keeps being overtaken soon ranks with the highest and, never served
- * lately, goes first.
- */
-export function pickFairRenders<
-  T extends { id: string; organizationId: string; priority: string; createdAt: Date },
->(
-  waiting: readonly T[],
-  lastServed: ReadonlyMap<string, Date>,
-  count: number,
-  now: Date = new Date(),
-): T[] {
-  if (count <= 0) return [];
-  const heads = new Map<string, T>();
-  for (const job of pickNext(waiting, waiting.length)) {
-    if (!heads.has(job.organizationId)) heads.set(job.organizationId, job);
+interface HeldRow extends HeldJob {
+  kind: ClipJobKind;
+}
+
+/** A waiting job as the estimate reads it. */
+export interface QueueRow {
+  id: string;
+  organizationId: string;
+  kind: ClipJobKind;
+  priority: string;
+  createdAt: Date;
+  videoId: string | null;
+  clipId: string | null;
+}
+
+export interface QueueSnapshot {
+  /** Waiting (QUEUED, not claimed), oldest first. */
+  waiting: QueueRow[];
+  /** Holding a slot, with how far each has got. */
+  holding: Array<QueueRow & { status: ClipJobStatus; progress: number }>;
+  lastServed: Map<string, number>;
+  /** True when more were waiting than one read takes: a position past it is not known. */
+  clipped: boolean;
+}
+
+function countByClass(holding: readonly HeldJob[]): Map<SchedulerClass, number> {
+  const counts = new Map<SchedulerClass, number>();
+  for (const job of holding) {
+    const cls = schedulerClassOf(job);
+    if (cls) counts.set(cls, (counts.get(cls) ?? 0) + 1);
   }
-  const served = (job: T) =>
-    lastServed.get(job.organizationId)?.getTime() ?? Number.NEGATIVE_INFINITY;
-  return [...heads.values()]
-    .sort((a, b) => {
-      const rank = agedRank(b, now) - agedRank(a, now);
-      if (rank !== 0) return rank;
-      const x = served(a);
-      const y = served(b);
-      if (x !== y) return x < y ? -1 : 1;
-      return a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
-    })
-    .slice(0, count);
+  return counts;
 }
-
-/** Module 11: an export waiting this long counts as one priority step higher (no starving). */
-export const RENDER_AGING_MS = 10 * 60_000;
-
-function agedRank(job: { priority: string; createdAt: Date }, now: Date): number {
-  const waited = Math.max(0, now.getTime() - job.createdAt.getTime());
-  return Math.min(
-    TOP_PRIORITY_RANK,
-    priorityRank(job.priority) + Math.floor(waited / RENDER_AGING_MS),
-  );
-}
-
-const TOP_PRIORITY_RANK = priorityRank(JOB_PRIORITIES[JOB_PRIORITIES.length - 1] as string);

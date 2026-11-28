@@ -66,6 +66,7 @@ import { RefusalAlert } from '../home/refusal-alert';
 import { RangeControl } from '../setup/range-control';
 import { shortfallSentence } from '../setup/setup-model';
 import { useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
 import {
   AUTO_EDIT_DONE,
   AUTO_EDIT_HELP,
@@ -322,6 +323,7 @@ export function AutoEditDialog({
             <p className="m-0 font-sans text-sm text-ink" role="status">
               {autoEditStepLabel(job)}
             </p>
+            <WaitingNote job={job} className="m-0 font-sans text-sm text-ink type-muted" />
           </div>
         ) : (
           <div className="flex flex-col gap-4">

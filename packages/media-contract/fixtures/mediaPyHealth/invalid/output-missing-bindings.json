@@ -4,5 +4,6 @@
   "pythonVersion": "3.13.18",
   "simulation": true,
   "taskQueue": "postgear-media-py",
-  "modelsPresent": false
+  "modelsPresent": false,
+  "hostedAboveMinutes": null
 }

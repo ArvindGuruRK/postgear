@@ -67,12 +67,13 @@ import { ActionLink } from '@/components/home/home-actions';
 import { ApiError } from '@/lib/api';
 import { priceClipSetup, startHighlights } from '@/lib/clips-api';
 import { createRecipe, listClipBrandKits, listRecipes } from '@/lib/clips-recipes-api';
-import type { ClipVideoDetail, SetupPriceView } from '@/types/clips';
+import type { ClipsHostedLane, ClipVideoDetail, SetupPriceView } from '@/types/clips';
 import type { ClipBrandKitView } from '@/types/clips-recipes';
 import { AiMinutesChip } from '../home/clips-meters';
 import { NameDialog } from '../layouts/name-dialog';
 import { clipErrorSentence } from '../library/clip-actions';
 import { LanguageSelect } from '../panels/captions-panel';
+import { AiPrivacyHint } from './ai-privacy-hint';
 import { RangeControl } from './range-control';
 import {
   CHANGED_MARK,
@@ -143,6 +144,7 @@ export function SetupForm({
   detail,
   action = { available: false, vision: false },
   faces = false,
+  hostedLane = null,
 }: {
   orgId: string;
   detail: ClipVideoDetail;
@@ -150,6 +152,8 @@ export function SetupForm({
   action?: { available: boolean; vision: boolean };
   /** Module 08: faces can be found right now (`ai.faces` in the clips status), so Follow The Speaker can run. */
   faces?: boolean;
+  /** Module 15: where long speech goes (`ai.hostedLane`), for the privacy hint beside the chip. */
+  hostedLane?: ClipsHostedLane | null;
 }) {
   const router = useRouter();
   const { video } = detail;
@@ -670,7 +674,10 @@ export function SetupForm({
                 : []
             }
           />
-          <AiMinutesChip orgId={orgId} fallback={null} />
+          <div className="flex items-center gap-1">
+            <AiMinutesChip orgId={orgId} fallback={null} />
+            <AiPrivacyHint lane={hostedLane} />
+          </div>
           {shortfall ? (
             <Alert variant="warning" className="items-center" data-testid="clip-setup-shortfall">
               <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />

@@ -6,7 +6,7 @@
  */
 import type { Key, MeterKey, Tier } from '@postgear/entitlements';
 
-export type OperatorTab = 'plans' | 'overrides' | 'usage' | 'changes' | 'library';
+export type OperatorTab = 'plans' | 'overrides' | 'usage' | 'costs' | 'changes' | 'library';
 
 /** A stored or registry value: boolean, number, enum member, or null for unlimited. */
 export type EntitlementCellValue = boolean | number | string | null;
@@ -285,4 +285,72 @@ export interface LibrarySource {
   stickers: LibraryStatusCounts;
   sounds: LibraryStatusCounts;
   needsCreditLine: boolean;
+}
+
+// ---- Costs (Sprint 13, Module 15): `GET /operator/clips/costs` ---------------------
+
+/** What finished jobs of one kind cost us. Cents to a micro-dollar (4 decimals). */
+export interface KindCost {
+  kind: string;
+  jobs: number;
+  costed: number;
+  estimated: number;
+  cents: number;
+}
+
+export interface WorkspaceCost {
+  organizationId: string;
+  workspace: string | null;
+  jobs: number;
+  costed: number;
+  cents: number;
+}
+
+/** Ledger totals in display units (minutes, downloads). */
+export interface UsageTotals {
+  charged: number;
+  reversed: number;
+  adjusted: number;
+  net: number;
+}
+
+export interface MeterCost extends UsageTotals {
+  meter: string;
+  label: string;
+  kinds: string[];
+  cents: number;
+  /** Cents one net unit cost us; null when nothing net was charged. */
+  centsPerUnit: number | null;
+}
+
+export interface WorkspaceMeterUsage extends UsageTotals {
+  meter: string;
+  label: string;
+  organizationId: string;
+  workspace: string | null;
+}
+
+export interface PersonMeterUsage extends UsageTotals {
+  /** `meta.by`; null for entries that kept no person. */
+  userId: string | null;
+  person: string | null;
+  organizationId: string;
+  workspace: string | null;
+  meter: string;
+  label: string;
+}
+
+export interface CostsView {
+  /** ISO, inclusive. */
+  from: string;
+  /** ISO, exclusive. */
+  to: string;
+  /** The price table's date. */
+  prices: string;
+  totals: { jobs: number; costed: number; missing: number; estimated: number; cents: number };
+  byKind: KindCost[];
+  byWorkspace: WorkspaceCost[];
+  byMeter: MeterCost[];
+  usageByWorkspace: WorkspaceMeterUsage[];
+  usageByPerson: PersonMeterUsage[];
 }

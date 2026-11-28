@@ -1,0 +1,10 @@
+PostGear media service (apps/media)
+===================================
+
+PostGear's own code in this image (apps/media/src, apps/media/scripts) is
+PostGear's. The repository has no licence file, so no licence to copy,
+change or share this code is given with the image. Ask the owner before
+using it anywhere else.
+
+When a licence file is added at the repository's root, copy it here in
+place of this note.

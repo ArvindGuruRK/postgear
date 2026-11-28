@@ -342,6 +342,12 @@ export class ClipSweepService {
 
   // ---- Unused workspace stickers and sounds -----------------------------------
 
+  /**
+   * A made voice (Sprint 13, Module 09) is a sound like any other here. A
+   * clip marked removed with its video (an exported one, kept for its Media
+   * file) can never be opened or exported again, so it does not keep a file
+   * in use (Sprint 13, Module 15).
+   */
   async unusedLibraryFiles(now: Date): Promise<number> {
     const cutoff = new Date(now.getTime() - UNUSED_LIBRARY_MS);
     const rows = await prisma.$queryRaw<
@@ -355,6 +361,7 @@ export class ClipSweepService {
         AND NOT EXISTS (
           SELECT 1 FROM "Clip" c
           WHERE c."organizationId" = a."organizationId"
+            AND c."removedAt" IS NULL
             AND jsonb_path_exists(
               c.document,
               '$.tracks[*].items[*].ref.asset ? (@ == $id)',

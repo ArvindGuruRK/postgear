@@ -374,6 +374,9 @@
             "faces": {
               "$ref": "#/$defs/Binding"
             },
+            "hostedTranscriber": {
+              "$ref": "#/$defs/Binding"
+            },
             "motion": {
               "$ref": "#/$defs/Binding"
             },
@@ -392,7 +395,8 @@
             "faces",
             "motion",
             "stills",
-            "speaker"
+            "speaker",
+            "hostedTranscriber"
           ],
           "type": "object"
         },
@@ -400,6 +404,18 @@
           "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
+        },
+        "hostedAboveMinutes": {
+          "anyOf": [
+            {
+              "maximum": 1440,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "modelsPresent": {
           "type": "boolean"
@@ -430,7 +446,8 @@
         "simulation",
         "taskQueue",
         "bindings",
-        "modelsPresent"
+        "modelsPresent",
+        "hostedAboveMinutes"
       ],
       "title": "MediaPyHealthOutput",
       "type": "object"

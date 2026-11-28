@@ -77,6 +77,7 @@ function job(
     createdAt: '2026-11-19T10:00:00.000Z',
     startedAt: '2026-11-19T10:00:01.000Z',
     finishedAt: null,
+    waiting: null,
     ...extra,
   };
 }
@@ -150,8 +151,35 @@ describe('FindClips', () => {
     expect(mockPlan.refresh).toHaveBeenCalled();
     // The job is followed: queued until the worker takes it.
     expect(await screen.findByTestId('find-clips-progress')).toHaveTextContent(
-      'Waiting for its turn',
+      'Waiting for our turn',
     );
+  });
+
+  it('a waiting run says about how long, and why a low priority one waits (Module 15)', () => {
+    const waiting = job('job-1', 'QUEUED', {
+      stageLabel: 'Waiting for our turn',
+      startedAt: null,
+      waiting: { aboutSeconds: 240, position: 3, lowPriority: true },
+    });
+    mockJobs.set('job-1', waiting);
+    renderFind({ run: run('QUEUED'), job: waiting });
+    const progress = screen.getByTestId('find-clips-progress');
+    expect(progress).toHaveTextContent('Waiting for our turn, about 4 minutes');
+    expect(within(progress).getByTestId('clips-waiting-note')).toHaveTextContent(
+      'Plans with a higher priority go first.',
+    );
+  });
+
+  it('a waiting run at normal priority has no second line', () => {
+    const waiting = job('job-1', 'QUEUED', {
+      startedAt: null,
+      waiting: { aboutSeconds: 0, position: 0, lowPriority: false },
+    });
+    mockJobs.set('job-1', waiting);
+    renderFind({ run: run('QUEUED'), job: waiting });
+    const progress = screen.getByTestId('find-clips-progress');
+    expect(progress).toHaveTextContent('Waiting for our turn, less than a minute');
+    expect(screen.queryByTestId('clips-waiting-note')).not.toBeInTheDocument();
   });
 
   it('a second run asks first, with the sentence and the price', async () => {

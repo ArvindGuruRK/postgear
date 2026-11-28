@@ -9,6 +9,11 @@ step is not available instead of failing at the first job.
 
 Later modules hang the real provider objects off this table; the states here
 are what `mediaPyHealth` reports.
+
+`TRANSCRIBER=auto` (Module 15) has two listeners: `transcriber` is reported
+as `auto` with our own machine's state (the lane every short job takes), and
+`hosted_transcriber` is the hosted lane, live only with its key. A job is
+routed by its length in `services/transcribe.py`.
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ from temporalio.exceptions import ApplicationError
 from postgear_media.core.settings import Settings
 from postgear_media.providers.speech.base import Speaker
 from postgear_media.providers.speech.kokoro import kokoro_ready
-from postgear_media.providers.transcribe.base import Transcriber
+from postgear_media.providers.transcribe.base import HostedLane, Transcriber
 from postgear_media.providers.vision.mediapipe_faces import face_model_path
 
 BindingState = Literal["simulation", "live", "off"]
@@ -47,6 +52,11 @@ class ProviderTable:
     stills: BindingInfo
     speaker: BindingInfo
     models_present: bool
+    #: The hosted lane (Groq): `live` only when `TRANSCRIBER` uses it and its key is set.
+    hosted_transcriber: BindingInfo
+    #: Jobs asking for more minutes of sound than this go to the hosted lane
+    #: (0: every job, `TRANSCRIBER=groq`); None while the lane is not live.
+    hosted_above_minutes: int | None
 
 
 def _installed(module: str) -> bool:
@@ -58,15 +68,39 @@ def _models_present(settings: Settings) -> bool:
     return root.is_dir() and any(root.iterdir())
 
 
+def _own_machine() -> BindingInfo:
+    """faster-whisper on this box: live only with the `ml` group installed."""
+    return BindingInfo("live" if _installed("faster_whisper") else "off", "faster-whisper")
+
+
+def _groq(settings: Settings) -> BindingInfo:
+    return BindingInfo("live" if settings.groq_api_key else "off", "groq")
+
+
 def _transcriber(settings: Settings) -> BindingInfo:
+    """The listener `TRANSCRIBER` names; under `auto`, named so, with our own machine's state."""
     choice = settings.transcriber
     if choice == "simulation":
         return BindingInfo("simulation", "simulation")
     if choice == "groq":
-        return BindingInfo("live" if settings.groq_api_key else "off", "groq")
-    if _installed("faster_whisper"):
-        return BindingInfo("live", "faster-whisper")
-    return BindingInfo("off", "faster-whisper")
+        return _groq(settings)
+    own = _own_machine()
+    if choice == "auto":
+        return BindingInfo(own.state, "auto")
+    return own
+
+
+def _hosted_transcriber(settings: Settings) -> BindingInfo:
+    """The hosted lane: on only for `auto` and `groq`, and only with the key."""
+    if settings.transcriber in {"auto", "groq"}:
+        return _groq(settings)
+    return BindingInfo("off", "groq")
+
+
+def _hosted_above_minutes(settings: Settings, hosted: BindingInfo) -> int | None:
+    if hosted.state != "live":
+        return None
+    return 0 if settings.transcriber == "groq" else settings.transcribe_hosted_above_minutes
 
 
 def _faces(settings: Settings) -> BindingInfo:
@@ -102,8 +136,11 @@ def build_provider_table(settings: Settings) -> ProviderTable:
             stills=sim,
             speaker=_speaker(settings),
             models_present=_models_present(settings),
+            hosted_transcriber=sim,
+            hosted_above_minutes=None,
         )
     has_cv = _installed("cv2")
+    hosted = _hosted_transcriber(settings)
     return ProviderTable(
         transcriber=_transcriber(settings),
         faces=_faces(settings),
@@ -111,6 +148,8 @@ def build_provider_table(settings: Settings) -> ProviderTable:
         stills=BindingInfo("live" if has_cv else "off", "opencv"),
         speaker=_speaker(settings),
         models_present=_models_present(settings),
+        hosted_transcriber=hosted,
+        hosted_above_minutes=_hosted_above_minutes(settings, hosted),
     )
 
 
@@ -123,7 +162,8 @@ def get_transcriber(settings: Settings) -> Transcriber:
 
     Simulation wins over everything (no library is imported). Otherwise
     `TRANSCRIBER` picks: `groq` needs its key, anything else is our own machine
-    and needs the `ml` group. A binding that cannot run raises a non-retryable
+    and needs the `ml` group (under `auto` too: the hosted lane is the extra,
+    `get_hosted_lane`). A binding that cannot run raises a non-retryable
     `MEDIA_BINDING_OFF`, so the job fails at once with a plain reason instead
     of retrying for an hour.
     """
@@ -134,8 +174,10 @@ def get_transcriber(settings: Settings) -> Transcriber:
         if found is not None:
             return found
         if info.state == "off":
+            # `auto` is off when our own machine is: name the part that is missing.
+            name = "faster-whisper" if info.name == "auto" else info.name
             raise ApplicationError(
-                f"The {info.name} listener cannot run on this service",
+                f"The {name} listener cannot run on this service",
                 type="MEDIA_BINDING_OFF",
                 non_retryable=True,
             )
@@ -164,6 +206,29 @@ def get_transcriber(settings: Settings) -> Transcriber:
             )
         _transcribers[key] = built
         return built
+
+
+def get_hosted_lane(settings: Settings) -> HostedLane | None:
+    """`TRANSCRIBER=auto`'s hosted lane, or None (simulation, another setting, no key).
+
+    One Groq listener per process, like `get_transcriber`. Building it sends
+    nothing: a request is made only when a long job is handed to it.
+    """
+    if settings.transcriber != "auto":
+        return None
+    table = build_provider_table(settings)
+    if table.hosted_transcriber.state != "live" or table.hosted_above_minutes is None:
+        return None
+    assert settings.groq_api_key is not None  # the table said live
+    key = ("groq", "hosted-lane")
+    with _transcribers_lock:
+        found = _transcribers.get(key)
+        if found is None:
+            from postgear_media.providers.transcribe.groq import GroqTranscriber  # noqa: PLC0415
+
+            found = GroqTranscriber(settings.groq_api_key.get_secret_value())
+            _transcribers[key] = found
+    return HostedLane(transcriber=found, above_ms=table.hosted_above_minutes * 60_000)
 
 
 def reset_transcribers() -> None:

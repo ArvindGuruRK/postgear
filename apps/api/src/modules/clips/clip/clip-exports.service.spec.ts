@@ -515,6 +515,22 @@ describe('ClipExportsService.latestPreview (GET /clips/:clipId/previews/latest)'
     const { service } = setup();
     expect((await refusal(service.latestPreview(OTHER_ORG, CLIP, NOW))).status).toBe(404);
   });
+
+  it('signs nothing for a clip removed with a video it plays (Module 15)', async () => {
+    const tables = seed();
+    Object.assign(tables.clips[0] as object, { removedAt: new Date(NOW.getTime() - 60_000) });
+    tables.jobs.push(
+      renderJob({
+        status: 'DONE',
+        proof: true,
+        finishedAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+        output: { mediaId: null, proofKey: PROOF_KEY, durationMs: 30_000 },
+      }),
+    );
+    const { service, privateStorage } = setup(tables);
+    expect((await service.latestPreview(TEST_ORG, CLIP, NOW)).preview).toMatchObject({ url: null });
+    expect(privateStorage.signedUrl).not.toHaveBeenCalled();
+  });
 });
 
 describe('exportProgressOf (the card ring)', () => {

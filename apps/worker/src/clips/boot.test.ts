@@ -4,7 +4,12 @@ import {
   RENDER_TASK_QUEUE,
   SCHEDULING_TASK_QUEUE,
 } from '@postgear/scheduling';
-import { CLIP_HEARTBEAT_THROTTLE, PUBLISHING_ACTIVITY_SLOTS, workerPlan } from './boot';
+import {
+  CLIP_HEARTBEAT_THROTTLE,
+  mediaSlotShortfall,
+  PUBLISHING_ACTIVITY_SLOTS,
+  workerPlan,
+} from './boot';
 
 const base = { WORKER_MEDIA_CONCURRENCY: 2, RENDER_CONCURRENCY: 1 };
 
@@ -58,5 +63,30 @@ describe('workerPlan', () => {
   it('a role listed twice still gives one worker per queue', () => {
     const plan = workerPlan({ ...base, WORKER_ROLES: ['render', 'render'] });
     expect(plan.map((worker) => worker.taskQueue)).toEqual([RENDER_TASK_QUEUE]);
+  });
+});
+
+describe('mediaSlotShortfall (Module 15)', () => {
+  const slots = { CLIPS_MEDIA_SLOTS: 4, CLIPS_MEDIA_PY_SLOTS: 2 };
+
+  it('is zero when the media slots cover every job the scheduler may start', () => {
+    expect(
+      mediaSlotShortfall({ ...slots, WORKER_ROLES: ['media'], WORKER_MEDIA_CONCURRENCY: 6 }),
+    ).toBe(0);
+    expect(
+      mediaSlotShortfall({ ...slots, WORKER_ROLES: ['media'], WORKER_MEDIA_CONCURRENCY: 8 }),
+    ).toBe(0);
+  });
+
+  it('counts the missing slots, so a waiting Find Clips run cannot block its own listening', () => {
+    expect(
+      mediaSlotShortfall({ ...slots, WORKER_ROLES: ['media'], WORKER_MEDIA_CONCURRENCY: 2 }),
+    ).toBe(4);
+  });
+
+  it('is zero for a worker without the media role', () => {
+    expect(
+      mediaSlotShortfall({ ...slots, WORKER_ROLES: ['render'], WORKER_MEDIA_CONCURRENCY: 1 }),
+    ).toBe(0);
   });
 });

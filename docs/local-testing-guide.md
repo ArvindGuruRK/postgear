@@ -1508,6 +1508,23 @@ npx jest --config apps/api/jest.config.js src/modules/studio/schedules
 npx jest --config apps/web/jest.config.js src/components/clips/schedule src/components/studio/schedule
 ```
 
+**The Clips Queue (Module 15).** One scheduler starts every Clips job. Three classes each have their own slots: exports (`CLIPS_RENDER_SLOTS`), Python jobs (listen, faces, voice; `CLIPS_MEDIA_PY_SLOTS`, default 2) and the rest (`CLIPS_MEDIA_SLOTS`, default 4). The worker's `WORKER_MEDIA_CONCURRENCY` must be at least the last two added together (default 6); the worker prints a warning at boot when it is not. Run `npm run migrate:deploy --workspace=packages/db` and `npm run db:generate` (the `ClipJob` cost columns), then restart the API and the Node worker.
+
+- Start the API with `CLIPS_MEDIA_SLOTS=1` to see the queue on a laptop. Start Find Clips on three videos: the second and third say "Waiting for our turn, about 2 minutes" (or "less than a minute") on the video page.
+- Priority: on `/operator`, Workspace Overrides, set **Queue Priority** to High for PostGear Demo Org and Low for PostGear Second Org. Import `https://www.twitch.tv/videos/900000008` (Find Clips holds 30 seconds) in the demo workspace and press Find Clips on it, then start Find Clips in the second workspace, then another in the demo workspace. The second workspace's run says "Plans with a higher priority go first." and the demo's later run starts before it. A low job gains one step for every 10 minutes it waits, so it is never left behind for long. Remove both overrides afterwards.
+- Paid AI jobs start only once their charge stands. The price on each AI button equals the charge: Listen To This Video (3 AI Minutes) on a three minute talk charges 3. On `PostGear Sample: Listening Fails` the listen fails and the 10 minutes come back (the chip goes up again).
+- **Costs** tab on `/operator` (superadmin only): today's jobs by kind, against each meter (charged, reversed, net, cost per unit) and by workspace, from the price table in `apps/api/src/modules/clips/costs/clip-prices.ts`. Workspaces never see it. Processor time is measured; model tokens and pictures are estimated from the research figures.
+- Removing a video deletes its private folder (`apps/api/uploads-private/clips/<workspace>/<video>`): transcript, signals, proxy, posters. The job rows that stay hold counts and ids only, for the ledger and the costs.
+- Clip Setup's Summary has an info button beside the AI minutes chip with three sentences: what AI makes from a video, that faces are positions never identities, and that both are deleted with the video. A fourth names Groq only while the hosted lane is on.
+- The hosted lane: `TRANSCRIBER=auto` sends speech longer than `TRANSCRIBE_HOSTED_ABOVE_MINUTES` (55) to Groq when `GROQ_API_KEY` is set, and listens on our own machine when Groq fails. Locally there is no key, so `/ready` says `hostedLane: null` and every listen stays on our machine.
+- The media image: stop `npm run dev:media` first (it holds port 8100), then `docker compose --profile media-image up -d media` (the slim image, about 350 MB; `MEDIA_IMAGE_TARGET=full` for the 1.47 GB one with the real listening and face libraries; the voice program is a separate `--build-arg VOICE=kokoro`). A listen then runs in the container under simulation (`docker logs postgear_media` shows `activity.end` with the job id and nothing said). Stop it with `docker compose --profile media-image stop media` and start `npm run dev:media` again. Neither image holds a model: the operator fills the `media_models` volume (see `docs/launch-readiness/06-clips-and-clips-ai.md`).
+
+```bash
+npx jest --config apps/api/jest.config.js src/modules/clips/jobs src/modules/clips/costs src/modules/clips/audit src/modules/clips/retention src/modules/admin/costs
+npx jest --config apps/web/jest.config.js src/components/operator src/components/clips/setup src/components/clips/audit
+npm run test --workspace=@postgear/media -- -k hosted_lane
+```
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

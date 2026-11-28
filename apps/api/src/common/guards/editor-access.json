@@ -441,6 +441,10 @@
       "access": "open",
       "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
     },
+    "GET /operator/clips/costs": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
     "GET /operator/entitlements/plans": {
       "access": "open",
       "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."

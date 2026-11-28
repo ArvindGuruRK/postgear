@@ -20,6 +20,11 @@ jest.mock('@postgear/db', () => ({
   prisma: {
     clipJob: { findFirst: jest.fn(async () => mockDb.job) },
     clipHighlightRun: { findFirst: jest.fn(async () => ({ params: mockDb.params })) },
+    // Module 15: the run's action charge stands (the audit covers a missing one).
+    usageEntry: {
+      findFirst: jest.fn(async () => ({ id: 'entry-action', units: 3000 })),
+      findMany: jest.fn(async () => []),
+    },
   },
 }));
 

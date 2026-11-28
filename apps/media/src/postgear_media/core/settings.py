@@ -31,6 +31,21 @@ SIMULATION_IN_PRODUCTION = "MEDIA_SIMULATION cannot be enabled in production"
 TOKEN_REQUIRED = "MEDIA_INTERNAL_TOKEN is required in production"  # noqa: S105 - a message
 SIMULATED_SPEAKER_IN_PRODUCTION = "MEDIA_SPEAKER=simulation cannot be used in production"
 
+#: `TRANSCRIBER=auto` (Module 15) sends a job to the hosted lane when it asks
+#: for more than this many minutes of sound, so nobody waits much longer than
+#: about ten minutes for our own machine. From Module 02's benchmark (README,
+#: Module 02 row: an Intel i7-8750H with 4 processors given to the container,
+#: faster-whisper `small`, int8, a 60 s recording): 10.2 s of listening, so
+#: 0.17 s per second of sound, and 4.7 s to load the model. Ten minutes is
+#: 600 s: (600 - 4.7) / 0.17 = 3,502 s of sound. A real listener's 5 minute
+#: chunks overlap by 3 s, so a stretch costs 300 / 297 of its length:
+#: 3,502 x 297 / 300 = 3,467 s, about 57.8 minutes, rounded down to 55.
+#: The default `WHISPER_MODEL` (`large-v3-turbo`) was not measured on a
+#: processor and is slower than `small`: a box that runs it measures it
+#: (`npm run clips:listen-benchmark`) and sets `TRANSCRIBE_HOSTED_ABOVE_MINUTES`
+#: from the same sum. The real-test plan does this before launch.
+DEFAULT_HOSTED_ABOVE_MINUTES = 55
+
 
 class Settings(BaseSettings):
     """Everything the service reads from its environment."""
@@ -70,7 +85,16 @@ class Settings(BaseSettings):
     media_max_activities: int = Field(default=1, ge=1, le=16)
     media_run_worker: bool = True
 
+    #: `auto` (Module 15): our own machine up to `TRANSCRIBE_HOSTED_ABOVE_MINUTES`
+    #: of sound a job, the hosted lane above it when `GROQ_API_KEY` is set, and
+    #: our own machine again when the hosted lane fails.
     transcriber: Literal["faster-whisper", "groq", "simulation", "auto"] = "faster-whisper"
+    transcribe_hosted_above_minutes: int = Field(
+        default=DEFAULT_HOSTED_ABOVE_MINUTES,
+        ge=0,
+        le=24 * 60,
+        description="TRANSCRIBER=auto: longer jobs go to the hosted lane.",
+    )
     whisper_model: str = "large-v3-turbo"
     groq_api_key: SecretStr | None = None
 

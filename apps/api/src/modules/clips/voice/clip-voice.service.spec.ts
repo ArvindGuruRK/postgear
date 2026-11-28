@@ -28,6 +28,7 @@ import {
   type FakeClipDb,
   type FakeTables,
   fakeClipDb,
+  readsLedger,
 } from '../testing/fake-clip-db';
 import { TEST_ORG, TEST_USER } from '../testing/rows';
 import { ClipVoiceRepository } from './clip-voice.repository';
@@ -134,6 +135,8 @@ function setup(
     },
   );
   const ledger = fakeLedger(options.limit ?? 10);
+  // Module 15: the scheduler starts a paid AI job only while its charge stands.
+  readsLedger(mockDb, ledger.entries);
   const scheduling = { startClipJob: jest.fn(async () => true) };
   const jobsRepository = new ClipJobsRepository();
   const jobs = new ClipJobsService(

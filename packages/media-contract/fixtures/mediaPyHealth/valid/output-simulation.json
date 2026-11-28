@@ -9,7 +9,9 @@
     "faces": { "state": "simulation", "name": "simulation" },
     "motion": { "state": "simulation", "name": "simulation" },
     "stills": { "state": "simulation", "name": "simulation" },
-    "speaker": { "state": "simulation", "name": "simulation" }
+    "speaker": { "state": "simulation", "name": "simulation" },
+    "hostedTranscriber": { "state": "simulation", "name": "simulation" }
   },
-  "modelsPresent": false
+  "modelsPresent": false,
+  "hostedAboveMinutes": null
 }

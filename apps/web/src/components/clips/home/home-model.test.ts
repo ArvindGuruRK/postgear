@@ -176,9 +176,17 @@ describe('etaLabel', () => {
 describe('stageLabel', () => {
   it("uses the API's words, or a default", () => {
     expect(stageLabel({ stageLabel: 'Getting the video' })).toBe('Getting the video');
-    expect(stageLabel({ stageLabel: 'Waiting for its turn' })).toBe('Waiting for its turn');
+    expect(stageLabel({ stageLabel: 'Waiting for our turn' })).toBe('Waiting for our turn');
     expect(stageLabel({ stageLabel: '   ' })).toBe('Getting ready');
     expect(stageLabel(null)).toBe('Getting ready');
+  });
+
+  it('says how long a queued job waits, when the API can tell (Module 15)', () => {
+    const queued = { status: 'QUEUED' as const, stageLabel: 'Waiting for our turn' };
+    expect(
+      stageLabel({ ...queued, waiting: { aboutSeconds: 240, position: 2, lowPriority: false } }),
+    ).toBe('Waiting for our turn, about 4 minutes');
+    expect(stageLabel({ ...queued, waiting: null })).toBe('Waiting for our turn');
   });
 });
 

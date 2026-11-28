@@ -27,6 +27,7 @@ import type {
   ClipVideoCard,
   ClipVideoPlatform,
 } from '@/types/clips';
+import { jobWords } from '../waiting-words';
 
 const BYTES_PER_GB = 1_000_000_000;
 const BYTES_PER_MB = 1_000_000;
@@ -380,9 +381,19 @@ export function etaLabel(etaSeconds: number | null | undefined): string | null {
   return `About ${minutes.toLocaleString('en-GB')} minutes left`;
 }
 
-/** The step in words for a busy card (the API's label, which already says "Waiting for its turn"). */
-export function stageLabel(job: Pick<ClipJobView, 'stageLabel'> | null): string {
-  return job?.stageLabel?.trim() || 'Getting ready';
+/**
+ * The step in words for a busy card: the API's step while running, and
+ * while queued "Waiting for our turn" with its time when there is one
+ * (Module 15, `jobWords`).
+ */
+export function stageLabel(
+  job: (Pick<ClipJobView, 'stageLabel'> & Partial<Pick<ClipJobView, 'status' | 'waiting'>>) | null,
+): string {
+  if (!job) return 'Getting ready';
+  return jobWords(
+    { status: job.status ?? 'RUNNING', waiting: job.waiting ?? null, stageLabel: job.stageLabel },
+    'Getting ready',
+  );
 }
 
 /** The delete dialog's sentence, counting the clips that go with the video. */

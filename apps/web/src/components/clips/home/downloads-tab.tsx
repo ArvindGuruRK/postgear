@@ -51,9 +51,11 @@ import { Download } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { deleteDownload, saveDownloadFile, saveDownloadToMedia } from '@/lib/clips-api';
-import type { DownloadView } from '@/types/clips';
+import type { ClipJobWaiting, DownloadView } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
 import { useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
+import { waitingLine } from '../waiting-words';
 import type { DownloadsState } from './use-downloads';
 
 export const DOWNLOADS_EMPTY = 'No downloads yet. Paste a link and choose Download.';
@@ -67,9 +69,16 @@ function messageOf(cause: unknown, fallback = NOT_THROUGH): string {
   return cause instanceof ApiError && cause.status !== 0 ? cause.message : fallback;
 }
 
-/** "Getting your file, 40%"; without a number yet, just the words. */
-export function preparingLine(progress: number, queued: boolean): string {
-  if (queued) return 'Waiting for its turn';
+/**
+ * "Getting your file, 40%"; without a number yet, just the words. Queued,
+ * "Waiting for our turn" with its time when the API can tell (Module 15).
+ */
+export function preparingLine(
+  progress: number,
+  queued: boolean,
+  waiting: ClipJobWaiting | null = null,
+): string {
+  if (queued) return waitingLine({ status: 'QUEUED', waiting });
   const percent = Math.max(0, Math.min(100, Math.round(progress)));
   return percent > 0 ? `Getting your file, ${percent}%` : 'Getting your file';
 }
@@ -174,7 +183,7 @@ export function DownloadRow({
   const line =
     job.status === 'DONE'
       ? 'Your file is ready'
-      : preparingLine(job.progress, job.status === 'QUEUED');
+      : preparingLine(job.progress, job.status === 'QUEUED', job.waiting ?? null);
 
   const onSave = async () => {
     if (saving) return;
@@ -228,6 +237,7 @@ export function DownloadRow({
               animated
               aria-label={`${view.title}: ${line}`}
             />
+            <WaitingNote job={job} />
           </div>
         ) : null}
 

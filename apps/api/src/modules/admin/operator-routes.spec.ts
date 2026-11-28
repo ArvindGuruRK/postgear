@@ -17,6 +17,8 @@ import { PLATFORM_ADMIN_KEY } from '../../common/decorators/platform-admin.decor
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { RedisService } from '../redis/redis.service';
+import { OperatorCostsController } from './costs/operator-costs.controller';
+import { OperatorCostsService } from './costs/operator-costs.service';
 import {
   OperatorChangesController,
   OperatorPlansController,
@@ -66,6 +68,8 @@ describe('operator routes', () => {
     changes: jest.fn(async () => ({ changes: [] })),
     savePlans: jest.fn(async () => ({ saved: 1 })),
   };
+  // Sprint 13, Module 15: the Clips costs read.
+  const costs = { costs: jest.fn(async () => ({ byKind: [] })) };
   const library = {
     runs: jest.fn(async () => []),
     items: jest.fn(async () => ({ items: [] })),
@@ -80,6 +84,7 @@ describe('operator routes', () => {
         OperatorWorkspacesController,
         OperatorChangesController,
         OperatorLibraryController,
+        OperatorCostsController,
       ],
       providers: [
         { provide: ConfigService, useValue: new ConfigService({ NODE_ENV: 'development' }) },
@@ -88,6 +93,7 @@ describe('operator routes', () => {
         { provide: RedisService, useValue: { incrementWithTtl: jest.fn(async () => 1) } },
         { provide: OperatorEntitlementsService, useValue: entitlements },
         { provide: OperatorLibraryService, useValue: library },
+        { provide: OperatorCostsService, useValue: costs },
       ],
     }).compile();
     app = moduleRef.createNestApplication();
@@ -161,12 +167,44 @@ describe('operator routes', () => {
     expect(library.hideItem).not.toHaveBeenCalled();
   });
 
+  it('lets only an operator read the Clips costs, and refuses a bad window first', async () => {
+    expect((await request(server()).get('/operator/clips/costs')).status).toBe(401);
+    for (const who of ['admin', 'member']) {
+      const response = await request(server())
+        .get('/operator/clips/costs')
+        .set('Cookie', [session(who), 'pg_org=org-cookie']);
+      expect(response.status).toBe(403);
+    }
+    expect(costs.costs).not.toHaveBeenCalled();
+
+    const cookie = session('operator');
+    const ok = await request(server())
+      .get('/operator/clips/costs?from=2026-11-01&to=2026-12-01')
+      .set('Cookie', cookie);
+    expect(ok.status).toBe(200);
+    expect(costs.costs).toHaveBeenCalledWith({ from: '2026-11-01', to: '2026-12-01' });
+
+    for (const query of [
+      'from=2026-09-01&to=2026-12-03',
+      'from=2026-11-10&to=2026-11-01',
+      'from=2026-11-01&orgId=org-cookie',
+      'from=yesterday',
+    ]) {
+      expect(
+        (await request(server()).get(`/operator/clips/costs?${query}`).set('Cookie', cookie))
+          .status,
+      ).toBe(400);
+    }
+    expect(costs.costs).toHaveBeenCalledTimes(1);
+  });
+
   it('marks every operator controller with @PlatformAdmin()', () => {
     for (const controller of [
       OperatorPlansController,
       OperatorWorkspacesController,
       OperatorChangesController,
       OperatorLibraryController,
+      OperatorCostsController,
     ]) {
       expect(Reflect.getMetadata(PLATFORM_ADMIN_KEY, controller)).toBe(true);
     }

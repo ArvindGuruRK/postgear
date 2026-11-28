@@ -64,6 +64,8 @@ export function jobRow(overrides: Partial<ClipJob> = {}): ClipJob {
     startedAt: null,
     finishedAt: null,
     expiresAt: null,
+    costCents: null,
+    cost: null,
     ...overrides,
   };
 }

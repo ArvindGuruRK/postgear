@@ -36,8 +36,10 @@ const health: MediaPyHealthOutput = {
     motion: { state: 'simulation', name: 'simulation' },
     stills: { state: 'off', name: 'opencv' },
     speaker: { state: 'live', name: 'kokoro' },
+    hostedTranscriber: { state: 'simulation', name: 'simulation' },
   },
   modelsPresent: false,
+  hostedAboveMinutes: null,
 };
 
 let env: TestWorkflowEnvironment;
@@ -92,6 +94,7 @@ describe('clipRuntimeCheckWorkflow and the Python service', () => {
         motion: 'simulation',
         stills: 'off',
         speaker: 'live',
+        hostedTranscriber: 'simulation',
       },
     });
   });

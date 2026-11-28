@@ -92,7 +92,8 @@ const STAGE_LABELS: Record<ClipJobKind, Record<string, string>> = {
   },
 };
 
-export const WAITING_LABEL = 'Waiting for its turn';
+/** What a queued job says (Sprint 13, Module 15; it said "Waiting for its turn" before). */
+export const WAITING_LABEL = 'Waiting for our turn';
 export const PREVIEW_LABEL = 'Making the preview';
 
 /** The words for a job's current step. A Preview Export only ever shows "Making the preview". */

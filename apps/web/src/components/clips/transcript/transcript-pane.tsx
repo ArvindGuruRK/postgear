@@ -66,6 +66,8 @@ import { AiMinutesChip } from '../home/clips-meters';
 import { pricedLabel, WORD_PLACEHOLDER, withWordEdit } from '../panels/captions-model';
 import { usePeaks } from '../timeline/timeline-media';
 import { useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
+import { queuedOr } from '../waiting-words';
 import { type ApplyCut, CleanupTools } from './cleanup-tools';
 import {
   clipSpan,
@@ -359,7 +361,8 @@ export function TranscriptPane({
     body = (
       <div className="flex flex-col gap-2" data-testid="clip-transcript-listening">
         <Progress tone="ai" value={job?.progress ?? 0} aria-label="Listening to this clip" />
-        <p className={NOTE}>{LISTENING}</p>
+        <p className={NOTE}>{queuedOr(job, LISTENING)}</p>
+        <WaitingNote job={job} className={NOTE} />
         <Button
           variant="secondary"
           size="sm"

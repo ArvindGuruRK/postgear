@@ -87,6 +87,7 @@ export function sendJob(id: string, status: ClipJobView['status']): ClipJobView 
     createdAt: '2026-11-19T10:00:00.000Z',
     startedAt: '2026-11-19T10:00:01.000Z',
     finishedAt: status === 'RUNNING' ? null : '2026-11-19T10:02:00.000Z',
+    waiting: null,
   };
 }
 

@@ -16,21 +16,19 @@
  *   the input. A plan change mid-job never alters a running job.
  * - **Starting is best-effort.** A start that cannot reach Temporal leaves
  *   the row QUEUED; the maintenance reconcile starts it within minutes.
- * - **Imports wait their turn** (Module 04). `clips.concurrent_imports` is
- *   read when an IMPORT is started: at the cap the job stays QUEUED ("Waiting
- *   for its turn"), never refused. `startWaiting` hands the free slots to the
- *   waiting imports, highest priority first, then the oldest; it runs when a
- *   job is made, when any job ends (the worker's `settled` call) and in the
- *   reconcile. The claim is serializable, so two callers never overfill.
- * - **Exports wait their turn too** (Sprint 13, Module 11, the fair render
- *   queue; it replaces Sprint 12's plan of a few renders per workspace at
- *   once). An export (RENDER, not a proof) is made QUEUED and started by
- *   `startWaitingRenders`: one export running per workspace, at most
- *   `CLIPS_RENDER_SLOTS` across every workspace, the highest priority
- *   first and equal priorities taking turns (`claimWaitingRenders`). It runs
- *   when an export is made, when any job ends and in the reconcile. A
- *   Preview Export skips the queue: it is small, always `low`, and the
- *   editor waits on it, so it is started at once and holds no slot.
+ * - **Every job waits its turn** (Sprint 13, Module 15, one scheduler for
+ *   what Module 04's import cap and Module 11's fair render queue did). A job
+ *   is made QUEUED ("Waiting for our turn") and `ClipSchedulerService`
+ *   starts it when its class (`media`, `media-py`, `render`) and its
+ *   workspace have room: `clips.concurrent_imports` imports, 2 other media
+ *   jobs, 1 export and 1 Python job per workspace, the class's global slots
+ *   across all, the highest priority first and equal priorities taking
+ *   turns. A pass runs when a job is made (`start`), when any job ends (the
+ *   worker's `settled` call) and in the reconcile. The claim is
+ *   serializable, so two callers never overfill. A Preview Export skips the
+ *   queue: it is small, always `low`, and the editor waits on it, so it is
+ *   started at once and holds no slot. `view` says where a waiting job
+ *   stands (`ClipQueueService`).
  * - **An Auto-Edit takes its listening with it** (Sprint 13, Module 10).
  *   Cancelling an AUTO_EDIT job also cancels the listen job it started
  *   (`listenStarted`) while that one is still open, through the listen job's
@@ -65,8 +63,18 @@ import { isUuid } from '../clips.ids';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import type { ClipsTx } from '../clips.tx';
 import { ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
-import { type ClipJobView, median, TERMINAL_JOB_STATUSES, toJobView } from './clip-job-view';
+import {
+  type ClipJobView,
+  type ClipJobWaiting,
+  isWaitingTurn,
+  median,
+  TERMINAL_JOB_STATUSES,
+  toJobView,
+} from './clip-job-view';
 import { ClipJobsRepository, type NewClipJob } from './clip-jobs.repository';
+import { ClipQueueService } from './clip-queue.service';
+import { schedulerClassOf } from './clip-scheduler.rules';
+import { ClipSchedulerService } from './clip-scheduler.service';
 
 export interface CreateClipJob<K extends ClipJobKind> {
   /** From `newJobId()`, made before any charge. */
@@ -87,20 +95,16 @@ export interface CreateClipJob<K extends ClipJobKind> {
   priority?: JobPriority;
 }
 
-/** Exports running (or handed to Temporal) at once across every workspace, unless configured. */
-export const DEFAULT_RENDER_SLOTS = 2;
-
-/** A job the fair render queue starts: a RENDER that is not a Preview Export. */
+/** An export the scheduler starts in the `render` class: a RENDER that is not a Preview Export. */
 export function isQueuedRender(job: Pick<ClipJob, 'kind'> & { input?: unknown }): boolean {
-  if (job.kind !== ClipJobKind.RENDER) return false;
-  const input = job.input;
-  return !(input && typeof input === 'object' && (input as { proof?: unknown }).proof === true);
+  return job.kind === ClipJobKind.RENDER && schedulerClassOf(job) === 'render';
 }
 
 @Injectable()
 export class ClipJobsService {
   private readonly logger = new Logger(ClipJobsService.name);
-  private readonly renderSlots: number;
+  private readonly scheduler: ClipSchedulerService;
+  private readonly queue: ClipQueueService;
 
   constructor(
     private readonly repository: ClipJobsRepository,
@@ -108,13 +112,17 @@ export class ClipJobsService {
     private readonly resolver: EntitlementResolver,
     private readonly usage: UsageService,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
-    // Module 11: the render slots, and the batch notice when a cancel closes a batch's last job.
+    // Module 11: the slots, and the batch notice when a cancel closes a batch's last job.
     @Optional() config?: ConfigService,
     @Optional() private readonly batchNotices?: ClipBatchNoticeService,
+    // Module 15: the one scheduler and the estimate. A spec that builds this
+    // service by hand gets both made from the same repository and Temporal.
+    @Optional() scheduler?: ClipSchedulerService,
+    @Optional() queue?: ClipQueueService,
   ) {
-    const slots = Number(config?.get('CLIPS_RENDER_SLOTS') ?? DEFAULT_RENDER_SLOTS);
-    this.renderSlots =
-      Number.isFinite(slots) && slots >= 1 ? Math.floor(slots) : DEFAULT_RENDER_SLOTS;
+    this.scheduler =
+      scheduler ?? new ClipSchedulerService(repository, scheduling, resolver, config);
+    this.queue = queue ?? new ClipQueueService(repository, resolver, undefined, config);
   }
 
   /** A job id, made before the charge that names it. */
@@ -165,25 +173,17 @@ export class ClipJobsService {
   }
 
   /**
-   * Starts the job's workflow. An IMPORT goes through the workspace's cap
-   * (`startWaiting`) and an export through the fair render queue
-   * (`startWaitingRenders`), so either may stay QUEUED behind others; any
-   * other kind, a Preview Export included, is started at once. False means
-   * it stays QUEUED for later. The queue's claim never fails the request
-   * that made the job: a busy database leaves it QUEUED for the next pass.
+   * Starts the job's workflow through the scheduler (Module 15): a pass runs
+   * and the job starts when its class and its workspace have room, so it may
+   * stay QUEUED behind others; a Preview Export is started at once. False
+   * means it stays QUEUED for later. The scheduler's claim never fails the
+   * request that made the job: a busy database leaves it QUEUED for the next
+   * pass.
    */
   async start(
     job: Pick<ClipJob, 'id' | 'organizationId' | 'kind'> & { input?: unknown },
   ): Promise<boolean> {
-    if (job.kind === ClipJobKind.IMPORT) {
-      const started = await this.startWaiting(job.organizationId);
-      return started.includes(job.id);
-    }
-    if (isQueuedRender(job)) {
-      const started = await this.startRendersQuietly(job.organizationId);
-      return started.includes(job.id);
-    }
-    return this.dispatch(job);
+    return this.scheduler.start(job);
   }
 
   /** `create` then `start`. */
@@ -194,72 +194,60 @@ export class ClipJobsService {
   }
 
   /**
-   * Starts the workspace's waiting imports that fit under
-   * `clips.concurrent_imports`, highest priority first, then the oldest.
-   * Answers the ids started. A start Temporal refuses gives its claim back
-   * and stops the pass (the reconcile tries again); never throws for that.
+   * One scheduler pass across every class and workspace (Module 15): starts
+   * what may start now and answers the ids. Never throws; a busy database
+   * or an unreachable Temporal leaves the jobs QUEUED for the next pass.
    */
-  async startWaiting(orgId: string): Promise<string[]> {
-    const cap = await this.resolver.get(orgId, 'clips.concurrent_imports');
-    const claimed = await this.repository.claimWaitingImports(orgId, cap, new Date());
-    const started: string[] = [];
-
-    for (let index = 0; index < claimed.length; index += 1) {
-      const job = claimed[index] as (typeof claimed)[number];
-      if (await this.dispatch(job)) {
-        started.push(job.id);
-        continue;
-      }
-      // Temporal is out of reach: hand every remaining claim back.
-      for (const rest of claimed.slice(index)) {
-        await this.repository.releaseClaim(orgId, rest.id);
-      }
-      break;
-    }
-    return started;
+  startNext(orgId?: string): Promise<string[]> {
+    return this.scheduler.startNext(orgId);
   }
 
   /**
-   * Module 11: starts the exports the fair render queue allows now, across
-   * every workspace (see `claimWaitingRenders`). Answers the ids started. A
-   * start Temporal refuses gives its claim back and stops the pass (the
-   * reconcile tries again).
+   * Module 04's name for a pass (it started the waiting imports); now one
+   * pass of every class. Throws when the claim fails, as it always did.
    */
-  async startWaitingRenders(): Promise<string[]> {
-    const claimed = await this.repository.claimWaitingRenders(this.renderSlots, new Date());
-    const started: string[] = [];
-    for (let index = 0; index < claimed.length; index += 1) {
-      const job = claimed[index] as (typeof claimed)[number];
-      if (await this.dispatch(job)) {
-        started.push(job.id);
-        continue;
-      }
-      for (const rest of claimed.slice(index)) {
-        await this.repository.releaseClaim(rest.organizationId, rest.id);
-      }
-      break;
-    }
-    return started;
+  startWaiting(_orgId: string): Promise<string[]> {
+    return this.scheduler.pass();
   }
 
-  /** `startWaitingRenders` that logs instead of throwing (callers that must not fail). */
-  async startRendersQuietly(orgId: string): Promise<string[]> {
-    try {
-      return await this.startWaitingRenders();
-    } catch (error) {
-      this.logStartFailure(orgId, error);
-      return [];
-    }
+  /** Module 11's name for a pass (it started the waiting exports); now one pass of every class. */
+  startWaitingRenders(): Promise<string[]> {
+    return this.scheduler.pass();
+  }
+
+  /** Module 11's quiet pass: `startNext`. */
+  startRendersQuietly(orgId: string): Promise<string[]> {
+    return this.scheduler.startNext(orgId);
+  }
+
+  /**
+   * Counts a finished job in its kind's pace (Module 15), for the estimate
+   * of the jobs behind it. Never throws.
+   */
+  recordDuration(job: ClipJob): Promise<void> {
+    return this.queue.recordDuration(job);
+  }
+
+  /**
+   * Where each job given stands while it waits for its turn (Module 15);
+   * a job not waiting is left out. Never throws.
+   */
+  waitingFor(jobs: readonly ClipJob[]): Promise<Map<string, ClipJobWaiting>> {
+    return this.queue.waitingFor(jobs.filter(isWaitingTurn));
   }
 
   /**
    * One job. A running job carries the estimate a single look allows: this
    * workspace's recent jobs of the kind, scaled by what is left (the live
    * stream refines it from the pace it watches). So the page's polling
-   * fallback still shows "about 2 minutes left".
+   * fallback still shows "about 2 minutes left". A job waiting for its turn
+   * carries its place in the queue (Module 15).
    */
   async view(orgId: string, jobId: string): Promise<ClipJobView> {
     const job = await this.require(orgId, jobId);
+    if (isWaitingTurn(job)) {
+      return toJobView(job, null, (await this.waitingFor([job])).get(job.id) ?? null);
+    }
     if (job.status !== 'RUNNING') return toJobView(job);
     const priorSeconds = median(await this.repository.recentDurations(orgId, job.kind));
     return toJobView(job, { samples: [{ at: Date.now(), progress: job.progress }], priorSeconds });
@@ -304,15 +292,10 @@ export class ClipJobsService {
         if (job.kind === ClipJobKind.IMPORT && job.videoId) {
           await this.removeCancelledImport(orgId, job.videoId);
         }
-        if (job.kind === ClipJobKind.IMPORT) {
-          await this.startWaiting(orgId).catch((error: unknown) =>
-            this.logStartFailure(orgId, error),
-          );
-        }
+        // Module 15: a claimed job gave its slot back (the next one may start).
+        await this.startNext(orgId);
         if (job.kind === ClipJobKind.RENDER) {
-          // Module 11: a waiting export left the queue (the next one may start),
-          // and it may have been the last open job of its batch.
-          await this.startRendersQuietly(orgId);
+          // Module 11: it may have been the last open job of its batch.
           await this.batchNotices?.settleJob(job);
         }
       }
@@ -359,23 +342,12 @@ export class ClipJobsService {
   }
 
   /**
-   * The reconcile's start for a job whose earlier start was lost: straight
-   * to Temporal (an IMPORT here already holds its slot). Duplicates are
-   * rejected by workflow id, so a start that did land is never doubled.
+   * The reconcile's start for a Preview Export whose earlier start was lost:
+   * straight to Temporal (it holds no slot). Duplicates are rejected by
+   * workflow id, so a start that did land is never doubled.
    */
   restart(job: Pick<ClipJob, 'id' | 'organizationId' | 'kind'>): Promise<boolean> {
-    return this.dispatch(job);
-  }
-
-  /** One workflow start; false leaves the row QUEUED (logged). */
-  private async dispatch(job: Pick<ClipJob, 'id' | 'organizationId' | 'kind'>): Promise<boolean> {
-    const started = await this.scheduling.startClipJob(job.id, job.organizationId, job.kind);
-    if (!started) {
-      this.logger.warn(
-        JSON.stringify({ event: 'clips.job.start_deferred', jobId: job.id, kind: job.kind }),
-      );
-    }
-    return started;
+    return this.scheduler.dispatch(job);
   }
 
   /**
@@ -397,15 +369,5 @@ export class ClipJobsService {
         }),
       );
     }
-  }
-
-  private logStartFailure(orgId: string, error: unknown): void {
-    this.logger.warn(
-      JSON.stringify({
-        event: 'clips.job.start_waiting_failed',
-        orgId,
-        reason: error instanceof Error ? error.message : String(error),
-      }),
-    );
   }
 }

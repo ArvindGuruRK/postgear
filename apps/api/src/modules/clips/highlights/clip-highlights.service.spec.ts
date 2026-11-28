@@ -22,7 +22,13 @@ import { lostJobCode } from '../internal/clip-reconcile.service';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
-import { emptyTables, type FakeClipDb, type FakeTables, fakeClipDb } from '../testing/fake-clip-db';
+import {
+  emptyTables,
+  type FakeClipDb,
+  type FakeTables,
+  fakeClipDb,
+  readsLedger,
+} from '../testing/fake-clip-db';
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import type { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
@@ -138,6 +144,8 @@ function setup(
   const tables = options.tables ?? seed();
   mockDb = fakeClipDb(tables);
   const ledger = fakeLedger(options.limit ?? 30);
+  // Module 15: the scheduler starts a paid AI job only while its charge stands.
+  readsLedger(mockDb, ledger.entries);
   const jobsRepository = new ClipJobsRepository();
   const scheduling = {
     startClipJob: jest.fn(async () => options.startOk ?? true),

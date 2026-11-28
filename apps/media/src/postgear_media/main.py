@@ -1,7 +1,9 @@
 """FastAPI for people and health checks; all real work arrives through Temporal.
 
 - `GET /health`: the process is up. Open, touches nothing.
-- `GET /ready`: the worker is polling and storage answers; 503 otherwise.
+- `GET /ready`: the worker is polling and storage answers; 503 otherwise. Its
+  `hostedLane` (Module 15) says where long speech goes when `TRANSCRIBER`
+  sends it to a hosted listener (`{provider, aboveMinutes}`), else null.
 - `GET /tools`: the `mediaPyHealth` report (versions and bindings).
 - `GET /voices`: the voices Text To Speech can use here (`VoiceList`, Module 09).
 
@@ -27,7 +29,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from postgear_media.activities.base import answer
-from postgear_media.activities.health import health_report, voice_list
+from postgear_media.activities.health import health_report, hosted_lane, voice_list
 from postgear_media.core.logging import configure_logging, get_logger
 from postgear_media.core.settings import MEDIA_PY_TASK_QUEUE, Settings, get_settings
 from postgear_media.core.storage import create_private_storage
@@ -137,7 +139,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if supervisor.reason:
             checks["reason"] = supervisor.reason
         return JSONResponse(
-            {"ready": is_ready, "checks": checks},
+            {"ready": is_ready, "checks": checks, "hostedLane": hosted_lane(active)},
             status_code=status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 

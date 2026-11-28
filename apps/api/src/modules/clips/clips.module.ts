@@ -32,6 +32,7 @@ import { ClipCaptionStylesModule } from './captions/clip-caption-styles.module';
 import { ClipChannelsModule } from './channels/clip-channels.module';
 import { ClipItemModule } from './clip/clip-item.module';
 import { ClipsCoreModule } from './clips-core.module';
+import { ClipCostService } from './costs/clip-cost.service';
 import { ClipDownloadsController } from './downloads/clip-downloads.controller';
 import { ClipDownloadsRepository } from './downloads/clip-downloads.repository';
 import { ClipDownloadsService } from './downloads/clip-downloads.service';
@@ -132,6 +133,8 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
     ClipBatchExportsService,
     // Sprint 13, Module 14: Emote Maker.
     ClipEmotesService,
+    // Sprint 13, Module 15: what each job cost us (the settled call and the maintenance pass).
+    ClipCostService,
   ],
   // Nothing outside Clips needs its providers; a later module imports `ClipsCoreModule` itself.
 })

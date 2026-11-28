@@ -35,15 +35,29 @@ export const mediaPyHealthOutput = z
     /** The queue it polls. */
     taskQueue: z.string().min(1).max(64),
     bindings: z.strictObject({
+      /**
+       * The listener `TRANSCRIBER` names. Under `auto` (Module 15) it is named
+       * `auto` and carries our own machine's state: the lane short jobs take.
+       */
       transcriber: binding,
       faces: binding,
       motion: binding,
       stills: binding,
       /** Module 09: the voice Text To Speech uses (`simulation`, or `kokoro` run as its own program). */
       speaker: binding,
+      /**
+       * Module 15: the hosted lane (`groq`). `live` only when `TRANSCRIBER` is
+       * `auto` or `groq` and its key is set; then long speech leaves our servers.
+       */
+      hostedTranscriber: binding,
     }),
     /** Whether the model files a live binding needs are on this box. */
     modelsPresent: z.boolean(),
+    /**
+     * Module 15: jobs asking for more minutes of sound than this go to the
+     * hosted lane (0: every job, `TRANSCRIBER=groq`); null while it is not live.
+     */
+    hostedAboveMinutes: z.number().int().min(0).max(1440).nullable(),
   })
   .meta({ id: 'MediaPyHealthOutput', title: 'MediaPyHealthOutput' });
 

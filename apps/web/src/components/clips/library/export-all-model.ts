@@ -18,6 +18,7 @@ import type {
 } from '@/types/clips-batch';
 import type { RecipeView } from '@/types/clips-recipes';
 import { mergeJobView } from '../clip-job-model';
+import { WAITING_WORDS } from '../waiting-words';
 
 export const EXPORT_ALL_TOO_MANY = 'Export up to 30 clips at once.';
 export const BULK_TOO_MANY = 'Pick up to 50 clips at once.';
@@ -27,8 +28,8 @@ export const EXPORT_ALL_CLOSE_LINE =
   'You can close this. The exports carry on, and the bell tells you when they are done.';
 export const EXPORT_ALL_UNREACHABLE =
   'We could not start the exports. Check your connection and try again.';
-/** A clip whose export waits for the workspace's turn (the job's own label says the same). */
-export const WAITING_LABEL = 'Waiting for its turn';
+/** A clip whose export waits for its turn (Module 15: the shared words, `waiting-words.ts`). */
+export const WAITING_LABEL = WAITING_WORDS;
 export const EXPORT_ALL_LOAD_FAILED = 'The exports could not be loaded. Check your connection.';
 
 /** The sentence under a clip for what the batch did with it; null for a plain export. */

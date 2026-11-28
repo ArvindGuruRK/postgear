@@ -87,6 +87,7 @@ function job(id: string, overrides: Partial<ClipJobView> = {}): ClipJobView {
     createdAt: '2026-11-27T10:00:00.000Z',
     startedAt: null,
     finishedAt: null,
+    waiting: null,
     ...overrides,
   };
 }
@@ -141,7 +142,7 @@ const BATCH: ClipExportBatchView = {
       jobId: 'job-c',
       note: 'running',
       quality: '1080p',
-      job: job('job-c', { status: 'QUEUED', progress: 0, stageLabel: 'Waiting for its turn' }),
+      job: job('job-c', { status: 'QUEUED', progress: 0, stageLabel: 'Waiting for our turn' }),
     },
   ],
 };
@@ -206,7 +207,7 @@ describe('Export All', () => {
       within(rows[1] as HTMLElement).getByText('Already exported, so it is left as it is.'),
     ).toBeInTheDocument();
     expect(within(rows[2] as HTMLElement).getByText('Already exporting.')).toBeInTheDocument();
-    expect(within(rows[2] as HTMLElement).getByText('Waiting for its turn')).toBeInTheDocument();
+    expect(within(rows[2] as HTMLElement).getByText('Waiting for our turn')).toBeInTheDocument();
     await waitFor(() => expect(rows[0]?.querySelector('[role="progressbar"]')).not.toBeNull());
     expect(within(dialog).getByTestId('clips-export-all-counts')).toHaveTextContent('1 of 3 done');
 

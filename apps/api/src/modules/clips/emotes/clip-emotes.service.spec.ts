@@ -172,6 +172,16 @@ function build(
       async (org: string, id: string) =>
         rows.find((row) => row.id === id && row.organizationId === org) ?? null,
     ),
+    // Module 15's one scheduler: every waiting job here has its turn at once (its rules have their own spec).
+    claimNext: jest.fn(async (_slots: unknown, _cap: unknown, now: Date) => {
+      const waiting = rows.filter((row) => row.status === 'QUEUED' && row.startedAt === null);
+      for (const row of waiting) row.startedAt = now;
+      return waiting;
+    }),
+    releaseClaim: jest.fn(async (org: string, id: string) => {
+      const row = rows.find((entry) => entry.id === id && entry.organizationId === org);
+      if (row?.status === 'QUEUED') row.startedAt = null;
+    }),
   };
   const scheduling = {
     startClipJob: jest.fn(async (id: string) => {

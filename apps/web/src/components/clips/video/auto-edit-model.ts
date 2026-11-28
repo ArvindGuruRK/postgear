@@ -7,6 +7,7 @@ import { CLIP_MAX_MS, type RecipeSkip } from '@postgear/video-engine';
 import type { ClipJobView } from '@/types/clips';
 import type { AutoEditOutput } from '@/types/clips-recipes';
 import { minutesLabel } from '../setup/setup-model';
+import { waitingLine } from '../waiting-words';
 
 export const AUTO_EDIT_LABEL = 'Auto-Edit Video';
 export const AUTO_EDIT_HELP =
@@ -42,9 +43,15 @@ export function rangeTooLong(range: { fromMs: number; toMs: number }): boolean {
   return range.toMs - range.fromMs > CLIP_MAX_MS;
 }
 
-/** The job's step in words. */
-export function autoEditStepLabel(job: Pick<ClipJobView, 'stage' | 'stageLabel'> | null): string {
+/** The job's step in words; queued, the waiting line with its time (Module 15). */
+export function autoEditStepLabel(
+  job:
+    | (Pick<ClipJobView, 'stage' | 'stageLabel'> & Partial<Pick<ClipJobView, 'status' | 'waiting'>>)
+    | null,
+): string {
   if (!job) return LISTENING_STEP;
+  if (job.status === 'QUEUED')
+    return waitingLine({ status: 'QUEUED', waiting: job.waiting ?? null });
   if (job.stage === 'listening') return LISTENING_STEP;
   if (job.stage === 'applying') return APPLYING_STEP;
   return job.stageLabel;

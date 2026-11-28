@@ -63,6 +63,8 @@ import { Info, TriangleAlert } from 'lucide-react';
 import { useId, useMemo, useRef, useState } from 'react';
 import { GroupLabel, NOTE, PanelSection } from '@/components/studio/panel-ui';
 import type { CaptionStyleView } from '@/types/clips';
+import { WaitingNote } from '../waiting-note';
+import { queuedOr } from '../waiting-words';
 import { CaptionStyleDialog } from './caption-style-dialog';
 import { CaptionStyleDrawing } from './caption-style-tile';
 import { CaptionWords } from './caption-words';
@@ -392,7 +394,8 @@ export function CaptionsPanel({
         {listening && captions.job ? (
           <div className="flex flex-col gap-2" data-testid="clip-captions-listening">
             <Progress value={captions.job.progress} aria-label="Listening to this clip" />
-            <p className={NOTE}>{CAPTIONS_LISTENING}</p>
+            <p className={NOTE}>{queuedOr(captions.job, CAPTIONS_LISTENING)}</p>
+            <WaitingNote job={captions.job} className={NOTE} />
             <Button variant="secondary" size="sm" onClick={captions.cancelListening}>
               Cancel
             </Button>

@@ -2,7 +2,9 @@
  * The fair render queue (Sprint 13, Module 11) against an in-memory
  * database: one export running per workspace, the global slots, the
  * highest priority first, equal priorities taking turns, Preview Export
- * skipping the queue, and serializable claims that never overfill.
+ * skipping the queue, and serializable claims that never overfill. Since
+ * Module 15 these are the `render` class of the one scheduler (`nextJobs`,
+ * `claimNext`); the rules for every class are in `clip-scheduler.rules.spec.ts`.
  */
 import { type ClipJob, Prisma } from '@postgear/db';
 import type { PrivateStorage } from '@postgear/storage';
@@ -11,8 +13,9 @@ import type { UsageService } from '../../entitlements/usage.service';
 import type { SchedulingService } from '../../scheduling/scheduling.service';
 import { emptyTables, type FakeClipDb, type FakeTables, fakeClipDb } from '../testing/fake-clip-db';
 import { jobRow } from '../testing/rows';
-import { ClipJobsRepository, pickFairRenders, RENDER_AGING_MS } from './clip-jobs.repository';
+import { ClipJobsRepository } from './clip-jobs.repository';
 import { ClipJobsService, isQueuedRender } from './clip-jobs.service';
+import { nextJobs, QUEUE_AGING_MS, type SchedulerJob, servedKey } from './clip-scheduler.rules';
 
 let mockDb: FakeClipDb;
 jest.mock('@postgear/db', () => {
@@ -34,6 +37,33 @@ const T0 = new Date('2026-11-27T10:00:00.000Z');
 
 function at(seconds: number): Date {
   return new Date(T0.getTime() + seconds * 1000);
+}
+
+/** Only render slots: the shape `claimNext` takes. */
+function renderSlots(render: number) {
+  return { media: 0, 'media-py': 0, render };
+}
+
+const noImports = async () => 0;
+/** No export needs a charge to start (only paid AI kinds do). */
+const everyStarts = async () => true;
+
+/** Module 11's `pickFairRenders`, as the render class of `nextJobs`. */
+function pickFairRenders<T extends SchedulerJob>(
+  waiting: readonly T[],
+  lastServed: ReadonlyMap<string, Date>,
+  count: number,
+  now: Date,
+): T[] {
+  const served = new Map(
+    [...lastServed].map(([orgId, date]) => [servedKey('render', orgId), date.getTime()]),
+  );
+  return nextJobs(
+    waiting,
+    [],
+    { slots: renderSlots(count), importsPerWorkspace: new Map(), lastServed: served },
+    now,
+  );
 }
 
 let count = 0;
@@ -73,7 +103,12 @@ async function drain(tables: FakeTables, slots: number, steps = 50): Promise<str
   let clock = 1000;
   for (let step = 0; step < steps; step += 1) {
     clock += 1;
-    const claimed = await repository.claimWaitingRenders(slots, at(clock));
+    const claimed = await repository.claimNext(
+      renderSlots(slots),
+      noImports,
+      at(clock),
+      everyStarts,
+    );
     for (const job of claimed) {
       const row = tables.jobs.find((candidate) => candidate.id === job.id) as ClipJob;
       order.push(`${row.organizationId}:${(row.input as { n?: number }).n ?? '?'}`);
@@ -145,11 +180,11 @@ describe('pickFairRenders: no workspace starves', () => {
     expect(pickFairRenders(waiting, lastServed, 1, at(300))[0]?.organizationId).toBe(HIGH);
     // Twenty minutes in, the low export ranks with the highest and was never served: it goes.
     expect(pickFairRenders(waiting, lastServed, 1, at(1_201))[0]?.organizationId).toBe(LOW);
-    expect(RENDER_AGING_MS).toBe(600_000);
+    expect(QUEUE_AGING_MS).toBe(600_000);
   });
 });
 
-describe('ClipJobsRepository.claimWaitingRenders', () => {
+describe('ClipJobsRepository.claimNext (exports)', () => {
   it('claims at most one export per workspace, within the slots, and never a preview', async () => {
     const tables = emptyTables();
     const proof = exportJob(A, { proof: true, createdAt: at(0) });
@@ -160,7 +195,12 @@ describe('ClipJobsRepository.claimWaitingRenders', () => {
     tables.jobs.push(proof, a1, a2, b1, c1);
     mockDb = serialDb(tables).db;
 
-    const claimed = await new ClipJobsRepository().claimWaitingRenders(2, at(500));
+    const claimed = await new ClipJobsRepository().claimNext(
+      renderSlots(2),
+      noImports,
+      at(500),
+      everyStarts,
+    );
     expect(claimed.map((job) => job.id)).toEqual([a1.id, b1.id]);
     expect(a1.startedAt).toEqual(at(500));
     expect(b1.startedAt).toEqual(at(500));
@@ -168,7 +208,9 @@ describe('ClipJobsRepository.claimWaitingRenders', () => {
     expect(a2.startedAt).toBeNull();
 
     // Both slots are held now (claimed, not yet RUNNING): nothing more starts.
-    expect(await new ClipJobsRepository().claimWaitingRenders(2, at(501))).toEqual([]);
+    expect(
+      await new ClipJobsRepository().claimNext(renderSlots(2), noImports, at(501), everyStarts),
+    ).toEqual([]);
   });
 
   it('leaves a workspace with an export running alone, and a running preview holds no slot', async () => {
@@ -182,7 +224,12 @@ describe('ClipJobsRepository.claimWaitingRenders', () => {
     tables.jobs.push(a2, b2);
     mockDb = serialDb(tables).db;
 
-    const claimed = await new ClipJobsRepository().claimWaitingRenders(3, at(500));
+    const claimed = await new ClipJobsRepository().claimNext(
+      renderSlots(3),
+      noImports,
+      at(500),
+      everyStarts,
+    );
     expect(claimed.map((job) => job.id)).toEqual([b2.id]);
   });
 
@@ -194,8 +241,8 @@ describe('ClipJobsRepository.claimWaitingRenders', () => {
 
     const repository = new ClipJobsRepository();
     const [first, second] = await Promise.all([
-      repository.claimWaitingRenders(1, at(500)),
-      repository.claimWaitingRenders(1, at(500)),
+      repository.claimNext(renderSlots(1), noImports, at(500), everyStarts),
+      repository.claimNext(renderSlots(1), noImports, at(500), everyStarts),
     ]);
     expect([...first, ...second]).toHaveLength(1);
     expect(options).toEqual([
@@ -226,7 +273,7 @@ describe('ClipJobsRepository.claimWaitingRenders', () => {
     }) as unknown as FakeClipDb['$transaction'];
     mockDb = db;
 
-    expect(await repository.claimWaitingRenders(1, at(500))).toEqual([]);
+    expect(await repository.claimNext(renderSlots(1), noImports, at(500), everyStarts)).toEqual([]);
     expect(attempts).toBe(2);
     expect(winner).toHaveLength(1);
   });
@@ -239,7 +286,7 @@ describe('the fair starting order (two workspaces)', () => {
     mockDb = serialDb(tables).db;
     const repository = new ClipJobsRepository();
     // The low batch's first export starts alone, then the high batch arrives.
-    const first = await repository.claimWaitingRenders(1, at(900));
+    const first = await repository.claimNext(renderSlots(1), noImports, at(900), everyStarts);
     expect(first).toHaveLength(1);
     (tables.jobs.find((row) => row.id === first[0]?.id) as ClipJob).status = 'RUNNING';
     tables.jobs.push(...batch(HIGH, 3, 'high', 10));
@@ -273,7 +320,12 @@ describe('the fair starting order (two workspaces)', () => {
     tables.jobs.push(...batch(A, 2, 'normal', 1), ...batch(B, 1, 'normal', 5));
     mockDb = serialDb(tables).db;
 
-    const claimed = await new ClipJobsRepository().claimWaitingRenders(4, at(900));
+    const claimed = await new ClipJobsRepository().claimNext(
+      renderSlots(4),
+      noImports,
+      at(900),
+      everyStarts,
+    );
     expect(claimed.map((job) => job.organizationId).sort()).toEqual([A, B]);
   });
 });
@@ -281,7 +333,7 @@ describe('the fair starting order (two workspaces)', () => {
 describe('ClipJobsService and the render queue', () => {
   function service(claimed: Array<{ id: string; organizationId: string; kind: 'RENDER' }>) {
     const repository = {
-      claimWaitingRenders: jest.fn(async () => claimed),
+      claimNext: jest.fn(async () => claimed),
       releaseClaim: jest.fn(async () => undefined),
     };
     const scheduling = { startClipJob: jest.fn(async () => true) };
@@ -303,7 +355,12 @@ describe('ClipJobsService and the render queue', () => {
     const job = { id: 'export-1', organizationId: A, kind: 'RENDER' as const };
     const { jobs, repository, scheduling } = service([job]);
     await expect(jobs.start({ ...job, input: { proof: false } })).resolves.toBe(true);
-    expect(repository.claimWaitingRenders).toHaveBeenCalledWith(3, expect.any(Date));
+    expect(repository.claimNext).toHaveBeenCalledWith(
+      { media: 4, 'media-py': 2, render: 3 },
+      expect.any(Function),
+      expect.any(Date),
+      expect.any(Function),
+    );
     expect(scheduling.startClipJob).toHaveBeenCalledWith('export-1', A, 'RENDER');
   });
 
@@ -320,7 +377,7 @@ describe('ClipJobsService and the render queue', () => {
     await expect(
       jobs.start({ id: 'proof-1', organizationId: A, kind: 'RENDER', input: { proof: true } }),
     ).resolves.toBe(true);
-    expect(repository.claimWaitingRenders).not.toHaveBeenCalled();
+    expect(repository.claimNext).not.toHaveBeenCalled();
     expect(scheduling.startClipJob).toHaveBeenCalledWith('proof-1', A, 'RENDER');
   });
 
@@ -338,7 +395,7 @@ describe('ClipJobsService and the render queue', () => {
 
   it('never fails the request when the claim itself fails', async () => {
     const { jobs, repository } = service([]);
-    repository.claimWaitingRenders.mockRejectedValue(new Error('busy'));
+    repository.claimNext.mockRejectedValue(new Error('busy'));
     await expect(
       jobs.start({ id: 'export-3', organizationId: A, kind: 'RENDER', input: { proof: false } }),
     ).resolves.toBe(false);

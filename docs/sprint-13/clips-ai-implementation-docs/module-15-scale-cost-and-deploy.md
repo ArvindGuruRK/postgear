@@ -1,6 +1,6 @@
 # Module 15: Scale, Cost And Deploy
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done 2026-11-28, one session (a real Groq call, the real `large-v3-turbo` benchmark and real job speeds wait for the owner) | Size: L (one full session)
 > **Depends on**: [Module 02](module-02-transcription.md), [Module 07](module-07-face-detection-and-detect-camera.md), and Sprint 12 Modules 01 and 19 (the entitlement registry, the usage meter and the operator screen)
 > **Stories**: CA-10.1, CA-10.2, CA-10.3
 > **Decisions**: D13-02 (AI Minutes, settled and built in Sprint 12 Module 01), D13-03 (the hosted lane), D13-11 (no always-on graphics card)
@@ -46,16 +46,17 @@ The cost table this module fills in, one row per thing that costs us something. 
 
 | Cost driver | What we pay | Where the number comes from |
 |---|---|---|
-| Import and render (FFmpeg) | Processor seconds and storage per minute of video | Sprint 12 Module 05 and 20 benchmarks |
-| Listen (own machine or hosted lane) | Processor seconds per minute, or the hosted bill per audio minute | Module 02 benchmark, the provider's price page |
-| Read (the language model) | Tokens in and out per run | Module 05 simulated and real runs |
-| Look For Action | Processor seconds, plus pictures if the vision check is on | Module 06 |
-| Faces | Processor seconds per minute | Module 07 benchmark |
-| Translate, voice | Model tokens; voice processor seconds | Modules 03 and 09 |
-| **Emote export** (`EMOTE`) | A few processor seconds: at most six encodes per size at 112 px or below, no AI | Module 14 spike (three real clips); recorded here when known |
-| **Schedule picture** | One headless-browser screenshot in the API's existing exporter and one Twitch call (cached 10 minutes) | Studio exporter timing; Twitch calls are free |
-| **Editor seat** | No compute of its own. The cost is what the Editor uses from the workspace's meters (already counted) plus support. The seat price is a plan decision (`members.editors_max`); this module shows the usage per Editor through `UsageEntry.meta.by` | Module 14 sets `meta.by`; the cost route groups by it |
-| Storage and egress | Per GB held, per GB served, in the S3-compatible bucket pair | The provider's price page (R2 or S3), dated |
+| **One vCPU second** (the unit every processor row uses) | $0.0000072 (a CCX33 at EUR 0.1891 an hour for 8 dedicated vCPU, at $1.10 a euro: $0.026 a vCPU hour). Railway's about $20 a vCPU month (about $0.027 a vCPU hour) agrees. A job's processor seconds are the seconds it ran times the vCPU its slot takes (export 4, listening on our box 8, faces and voice 4, the rest 2) | Research 07 section 1 (Hetzner, verified 2026-11-14; the euro rate is the header's assumption); the hosting guide section 1 (Railway, reported 2026-11-12). The table in code: `apps/api/src/modules/clips/costs/clip-prices.ts` (`CLIP_PRICES_DATE` 2026-11-14) |
+| Import and render (FFmpeg) | **Export**: a 60 s 1080p clip at the measured worst case (481 CPU seconds) is $0.0035; at real time on a 4 vCPU slot (240 vCPU seconds) $0.0017. A Fade montage costs about 1.5 times a Cut one. The file is held a month: a 30 MB export is $0.00045. **Import**: storage from research 07 (0.9 GB of proxy at 2 Mbit/s per source hour) is $0.0135 a month kept; the import's processor seconds are **measured in the real test**: import a one hour and a ten minute video on the media box and read the Import row of the Costs tab (seconds it ran times 2 vCPU; its files' bytes from `ClipAsset`) | Sprint 12 Module 05 benchmark (i7-10850H, FFmpeg 9.0.2, times real time: Fullscreen 720p 3.04, 1080p 1.92, 1080p60 1.18; Blurred 720p 2.14, 1080p 1.28, 1080p60 0.87; peak memory 192 to 785 MB); Sprint 12 Module 15 (gameplay and heavy text: 720p 3.27, 1080p 1.81, 1080p60 1.06); research 07 section 2 (481 CPU seconds, measured 2026-11-17; storage assumption); Module 11 Decision Log (Fade 1.5 times). Sprint 12 Module 20 proved the worker image but took no timing, and no import was ever timed |
+| Listen (own machine or hosted lane) | **Our box, `small`**: 0.17 s per second of sound on 4 processors, so about 0.68 vCPU seconds a second: $0.018 an audio hour ($0.0003 a minute). **Our box, `large-v3-turbo`** (the default): at 1 times real time on 8 vCPU, $0.21 an audio hour ($0.0035 a minute) when the box is billed for it, nothing extra on a box already running; its real speed is **measured in the real test**: listen to the one and ten minute recordings with `large-v3-turbo` on the media box and read the Listen row (seconds it ran times 8 vCPU). **Groq turbo**: $0.04 an audio hour ($0.00067 a minute), at least 10 s billed a request (`large-v3` $0.111); the Listen row prices the seconds Groq heard | Module 02 benchmark (i7-8750H, 4 processors, faster-whisper `small` int8, the 60 s Verideck narration: 10.2 s, 5.9 times real time, 4.7 s to load, 997 MB peak); research 07 sections 1 and 2 (Groq, verified 2026-11-14; the turbo speed is research 04's assumption) |
+| Read (the language model) | 16,000 tokens in and 2,500 out a pass for each source hour read, two passes: 32,000 in and 5,000 out an hour, $0.021 an hour on `gpt-4.1-mini` ($0.40 in, $1.60 out per 1M), $0.0057 on `gpt-6-luna`. Plus the run's own FFmpeg time (2 vCPU, less the time it waited for its listening job). Every Read cost is marked estimated: the AI engine returns no token counts. The real count is **measured in the real test**: run Find Clips over one hour of a real stream with the real model and compare OpenAI's usage for that hour with the Find Clips row | Research 07 sections 1 and 2 (prices verified 2026-11-14; the token counts are its assumption: 150 words a minute, 12,000 transcript tokens, overlap, a second pass for titles and reasons). Module 05's runs were simulated and priced 8 AI Minutes for the whole stream, no tokens |
+| Look For Action | **Motion**: 3 vCPU minutes a source hour (2 fps, 360p), $0.0013. **Vision check** (when on): at most 12 bursts of 4 stills, 48 pictures at 500 tokens: 24,000 tokens in, at most $0.0096 a run on `gpt-4.1-mini`. The real OpenCV decode time is **measured in the real test**: Look For Action on a one hour stream on the media box, read in the Find Clips row (the run's seconds include the motion and stills steps) | Module 06 under simulation (recorded levels, no real decode): the motion measure ran in 36 ms, 28 stills cut in 44 ms; research 07 section 2 (motion and vision assumptions; vision $0.01 to $0.05 for 20 candidates of 4 frames); `CLIP_STILL_BURSTS_MAX` and `CLIP_STILLS_PER_BURST` in `@postgear/scheduling` |
+| Faces | 3 vCPU minutes a source hour at 5 fps (10 ms a frame at 360p), $0.0013; a tenth of that on clip ranges only, which is how Find Faces runs. The real detector's speed is **measured in the real test**: Find Faces on a real face-cam clip on the media box, read in the Find Faces row (seconds it ran times 4 vCPU) | Research 07 section 2 (assumption). Module 07 took no benchmark: the real detector never ran here |
+| Translate, voice | **Translate**: about 200 tokens in and 200 out a minute (150 words a minute), $0.0004 a minute, $0.024 an hour on `gpt-4.1-mini`. It runs inside the API (no `TRANSLATE` job), so the Costs tab shows its AI Minutes but no job cost; its real tokens are **measured in the real test**: translate a ten minute transcript with the real model and read OpenAI's usage. **Voice**: Kokoro on our media box, no hosted bill; at most 24 vCPU seconds for a 2 s line, $0.00017. The real Kokoro time is **measured in the real test**: Make The Voice for a 10 s line on the media box, read in the Make The Voice row (seconds it ran times 4 vCPU) | Module 03 (translation inline, charged `clips.ai:translate:*`); research 07 section 2 (150 words a minute); Module 09's browser pass (a 2 s voice on the sound row in 6 s, end to end) |
+| **Emote export** (`EMOTE`) | A few processor seconds: at most six encodes per size at 112 px or below, no AI. Files held a day: the largest 7TV set (3.9 MB APNG) costs under $0.000002. The encode time is **measured in the real test**: Make An Emote from a real face-cam clip, read in the Emote row (seconds it ran times 2 vCPU) | Module 14 spike (local samples, 3 s at 112 px, GIF KB per ladder step: talk 145.5 to 37.4, busy `life` 327.7 to 117.2, Verideck 75.6 to 24.2, green screen 170.4 to 44.2; stills 3 to 22 KB; 7TV at 256 px up to 1421.7 KB GIF, 670.5 KB WebP, 3893.9 KB APNG). No timing was taken |
+| **Schedule picture** | One headless-browser screenshot in the API's existing exporter and one Twitch call (cached 10 minutes, free). It makes no Clips job and no meter charge (Module 14), so it is not on the Costs tab. Its time is **measured in the real test**: time the export request in the API log on the staging box and price it at the vCPU second above | Module 14 (the Studio exporter, not metered); Twitch calls are free |
+| **Editor seat** | No compute of its own. The cost is what the Editor uses from the workspace's meters (already counted) plus support. The seat price is a plan decision (`members.editors_max`). The Costs tab's Usage By Person table shows each Editor's charged, reversed and net units from `UsageEntry.meta.by` (a reversal counted under its charge's person); times the meter's Cost Per Unit, that is the Editor's cost. Support time is not measured | Module 14 sets `meta.by`; `GET /operator/clips/costs` groups by it |
+| Storage and egress | **R2**: $0.015 a GB a month, the first 10 GB free, egress free. Each job records its GB months: import files and exports a month, previews, downloads and emotes a day. A source hour (0.9 GB proxy, 0.3 GB clips) is $0.02 a month kept. **Railway volume** (only if files sit on Railway): $0.15 a GB a month, $0.05 a GB served. **S3**: neither research 07 nor the hosting guide prices it; if S3 is chosen, its price is read from its page then, dated | Research 07 sections 1 and 2 (R2 verified 2026-11-14); the hosting guide sections 1 and 6 (R2: 10 GB, no egress fees; Railway reported 2026-11-12) |
 
 ### 4. The AI Minutes Audit (Prices Shown Before The Press)
 
@@ -100,15 +101,15 @@ The decision is made (D13-02): the meter is **AI Minutes**, built in Sprint 12 M
 
 ## Tasks
 
-- [ ] `ClipQueueService.estimate`, `JobView.waiting`, the labels.
-- [ ] `ClipSchedulerService` and `nextJobs`; priority read from the job, concurrency from the entitlement, aging; Module 11's and Sprint 12's limits folded in.
-- [ ] Cost per job, the price table, the admin route with usage totals; the cost table above filled from the benchmarks.
-- [ ] The AI Minutes audit: the rate table test, one test per AI route, the no-free-route test, the copy fixes.
-- [ ] `TRANSCRIBER=auto`, the threshold, the fallback; the privacy text.
-- [ ] The deletion proof tests (including emote exports); the three sentences on the help or privacy page.
-- [ ] `Dockerfile.media` (both targets), the compose profile.
-- [ ] The deployment guide section, `.env.example`, the keys guide.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `ClipQueueService.estimate`, `JobView.waiting`, the labels.
+- [x] `ClipSchedulerService` and `nextJobs`; priority read from the job, concurrency from the entitlement, aging; Module 11's and Sprint 12's limits folded in.
+- [x] Cost per job, the price table, the admin route with usage totals; the cost table above filled from the benchmarks (rows a real machine must time say "measured in the real test").
+- [x] The AI Minutes audit: the rate table test, one test per AI route, the no-free-route test, the copy fixes.
+- [x] `TRANSCRIBER=auto`, the threshold, the fallback; the privacy text (a real Groq call is not made: it needs `GROQ_API_KEY` and the owner's word).
+- [x] The deletion proof tests (including emote exports); the three sentences (in Clip Setup's privacy hint: the app has no privacy page).
+- [x] `Dockerfile.media` (both targets), the compose profile.
+- [x] The deployment guide section, `.env.example`, the keys guide.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

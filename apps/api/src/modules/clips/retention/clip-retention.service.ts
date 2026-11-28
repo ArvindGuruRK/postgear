@@ -19,13 +19,19 @@
  *   deletes the montage when it was never exported and marks it `removedAt`
  *   when it was (its Media file stays), and stops its open jobs, exactly as
  *   for the video's own clips (`clipsPlayingVideo`).
+ * - **Files outside the prefix** (Sprint 13, Module 15): every row the
+ *   removal deletes takes its file, wherever it lives (a Preview Export of
+ *   one of its clips sits under `proofs/<jobId>/`), and the video's emotes
+ *   (`exports/<jobId>/`, which no row points at) go too. What AI made from
+ *   the video (transcripts with their word fixes, face files, stills, motion
+ *   and heard files) are rows or job files under its prefix.
  *
  * A person's delete keeps `status` as it was, so an import that failed and
  * was deleted still reads as such in the rights record; every list already
  * hides a row with `deletedAt`.
  */
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ClipOrigin, ClipVideoStatus, type Prisma, prisma } from '@postgear/db';
+import { ClipJobKind, ClipOrigin, ClipVideoStatus, type Prisma, prisma } from '@postgear/db';
 import { clipKeys, type PrivateStorage } from '@postgear/storage';
 import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
@@ -142,6 +148,16 @@ export class ClipRetentionService {
         } satisfies Prisma.ClipVideoUpdateManyMutationInput,
       });
       if (marked.count === 0) return null;
+      // Module 15: a row of the video whose file sits outside its prefix (a Preview
+      // Export of one of its clips, under `proofs/<jobId>/`) takes that file with it.
+      const elsewhere = await tx.clipAsset.findMany({
+        where: {
+          organizationId: orgId,
+          videoId,
+          NOT: { key: { startsWith: clipKeys.videoPrefix(orgId, videoId) } },
+        },
+        select: { key: true },
+      });
       await tx.clipAsset.deleteMany({ where: { organizationId: orgId, videoId } });
       const ofVideo = clipsPlayingVideo(orgId, videoId);
       // Module 11: a montage that goes takes the files of its own it holds on its OTHER
@@ -171,14 +187,40 @@ export class ClipRetentionService {
         where: { ...ofVideo, removedAt: null },
         data: { removedAt: now },
       });
-      return { montageKeys: montageFiles.map((file) => file.key) };
+      return { fileKeys: [...elsewhere, ...montageFiles].map((file) => file.key) };
     });
     if (!removed) return null;
 
     await this.deleteFiles(orgId, videoId);
-    for (const key of removed.montageKeys) await this.deleteFile(key);
+    for (const key of removed.fileKeys) await this.deleteFile(key);
+    await this.deleteEmotes(orgId, videoId);
     this.logger.log(JSON.stringify({ event: 'clips.video.removed', videoId, reason }));
     return video;
+  }
+
+  /**
+   * Module 14 and 15: the video's emotes (`exports/<jobId>/`, kept 24 hours
+   * and pointed at by no row) go with it, whatever their job's status. The
+   * read route answers them without addresses once the video is gone.
+   */
+  private async deleteEmotes(orgId: string, videoId: string): Promise<void> {
+    const emotes = await prisma.clipJob.findMany({
+      where: { organizationId: orgId, videoId, kind: ClipJobKind.EMOTE },
+      select: { id: true },
+    });
+    for (const job of emotes) {
+      try {
+        await this.storage.deletePrefix(clipKeys.exportPrefix(orgId, job.id));
+      } catch (error) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'clips.video.emote_files_left',
+            jobId: job.id,
+            reason: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    }
   }
 
   /**

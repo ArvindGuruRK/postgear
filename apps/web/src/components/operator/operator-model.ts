@@ -36,6 +36,7 @@ export const OPERATOR_TABS: readonly OperatorTab[] = [
   'plans',
   'overrides',
   'usage',
+  'costs',
   'changes',
   'library',
 ];
@@ -44,6 +45,7 @@ export const OPERATOR_TAB_NAMES: Readonly<Record<OperatorTab, string>> = {
   plans: 'Plans',
   overrides: 'Workspace Overrides',
   usage: 'Usage',
+  costs: 'Costs',
   changes: 'Change Log',
   library: 'Library',
 };
@@ -70,6 +72,13 @@ export const OPERATOR_COPY = {
   creditLineMissing: 'This source needs a credit line before its items are published.',
   bigScreen: 'The operator screens are made for a bigger screen. Open them on a laptop or desktop.',
   loadFailed: 'This could not be loaded. Check the API is running, then try again.',
+  costsHelp:
+    'What Clips jobs cost us, beside what workspaces were charged. Days run midnight to midnight UTC. Workspaces never see this.',
+  costsEstimated:
+    'Model tokens and pictures are estimated from the research figures, not read from a bill.',
+  noCosts: 'No Clips job finished in these days.',
+  noCostUsage: 'No Clips usage in these days.',
+  costsToBeforeFrom: 'Pick a To day on or after the From day.',
 } as const;
 
 /** "Saved 3 changes. They are live now." */
@@ -500,3 +509,97 @@ export const CREDIT_GROUP_NAMES = {
   'public-domain': 'Public Domain And CC0',
   own: "PostGear's Own",
 } as const;
+
+// ---- Costs (Sprint 13, Module 15) ---------------------------------------------------
+
+/** The most days one Costs window holds (the API's own cap). */
+export const COSTS_MAX_DAYS = 92;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** What each Clips job kind is called on the Costs tab. */
+export const JOB_KIND_NAMES: Readonly<Record<string, string>> = {
+  IMPORT: 'Import',
+  SEGMENT: 'Sharp Video',
+  HIGHLIGHTS: 'Find Clips',
+  RENDER: 'Export',
+  DOWNLOAD: 'Download',
+  TRANSCRIBE: 'Listen',
+  FACES: 'Find Faces',
+  TRANSLATE: 'Translate',
+  SPEECH: 'Make The Voice',
+  AUTO_EDIT: 'Auto-Edit Video',
+  EMOTE: 'Emote',
+};
+
+export function jobKindName(kind: string): string {
+  return Object.hasOwn(JOB_KIND_NAMES, kind) ? (JOB_KIND_NAMES[kind] ?? kind) : kind;
+}
+
+/**
+ * US cents as dollars: "$1.23", "$1,204.50"; under a dollar up to six
+ * decimals, so a job of a fraction of a cent still reads ("$0.0017"); "$0"
+ * for nothing. By hand, like `formatNumber`, so every runtime prints the same.
+ */
+export function usd(cents: number): string {
+  if (!Number.isFinite(cents) || cents === 0) return '$0';
+  const sign = cents < 0 ? '-' : '';
+  const dollars = Math.abs(cents) / 100;
+  if (dollars >= 1) {
+    const [whole = '0', fraction = '00'] = dollars.toFixed(2).split('.');
+    return `${sign}$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${fraction}`;
+  }
+  const [, fraction = ''] = dollars.toFixed(6).split('.');
+  const trimmed = fraction.replace(/0+$/, '');
+  return `${sign}$0.${trimmed.length < 2 ? trimmed.padEnd(2, '0') : trimmed}`;
+}
+
+/** `2026-11-28`, from the picked day's own calendar date. */
+function dayValue(day: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+}
+
+/** Whole days from one picked day to another (the same day is 0). */
+function daysBetween(from: Date, to: Date): number {
+  const start = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  const end = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((end - start) / DAY_MS);
+}
+
+/** The day after a picked day. */
+export function nextDay(day: Date): Date {
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+}
+
+/** The last To day a From day allows: 92 days in all. */
+export function lastCostsDay(from: Date): Date {
+  return new Date(from.getFullYear(), from.getMonth(), from.getDate() + COSTS_MAX_DAYS - 1);
+}
+
+/** Null when From and To (both counted) make a window the API takes; the sentence otherwise. */
+export function costsRangeProblem(from: Date, to: Date): string | null {
+  const days = daysBetween(from, to);
+  if (days < 0) return OPERATOR_COPY.costsToBeforeFrom;
+  if (days + 1 > COSTS_MAX_DAYS) return `Pick at most ${COSTS_MAX_DAYS} days.`;
+  return null;
+}
+
+/** The query of `GET /operator/clips/costs`: From and To both counted, so `to` is the day after. */
+export function costsQuery(from: Date, to: Date): string {
+  return new URLSearchParams({ from: dayValue(from), to: dayValue(nextDay(to)) }).toString();
+}
+
+/** "11 jobs finished, costing $0.06." */
+export function costsTotalSentence(jobs: number, cents: number): string {
+  return jobs === 1
+    ? `1 job finished, costing ${usd(cents)}.`
+    : `${formatNumber(jobs)} jobs finished, costing ${usd(cents)}.`;
+}
+
+/** "2 jobs have no cost yet. The maintenance pass adds it." */
+export function costsMissingSentence(missing: number): string {
+  return missing === 1
+    ? '1 job has no cost yet. The maintenance pass adds it.'
+    : `${formatNumber(missing)} jobs have no cost yet. The maintenance pass adds it.`;
+}

@@ -47,6 +47,8 @@ import type { ClipWordsView } from '@/types/clips';
 import type { PlaybackStore } from '../editor/playback';
 import { AiMinutesChip } from '../home/clips-meters';
 import { clipSpan, listenRange } from '../transcript/transcript-model';
+import { WaitingNote } from '../waiting-note';
+import { queuedOr } from '../waiting-words';
 import {
   BLEEP_LISTEN_HELP,
   BLEEP_LISTENING,
@@ -405,7 +407,8 @@ function Listen({
     return (
       <div className="flex flex-col gap-2" data-testid="clip-bleep-listening">
         <Progress tone="ai" value={job?.progress ?? 0} aria-label="Listening to this clip" />
-        <p className={NOTE}>{BLEEP_LISTENING}</p>
+        <p className={NOTE}>{queuedOr(job, BLEEP_LISTENING)}</p>
+        <WaitingNote job={job} className={NOTE} />
         <Button
           variant="secondary"
           size="sm"

@@ -65,6 +65,25 @@ export interface PlannedWorker {
   maxHeartbeatThrottleInterval?: Duration;
 }
 
+/**
+ * Module 15: how many `postgear-media` slots this worker is short of what the
+ * API's scheduler may hand out at once (0 when it is enough). Every scheduled
+ * media or Python job holds at most one media slot at a time, so
+ * `CLIPS_MEDIA_SLOTS + CLIPS_MEDIA_PY_SLOTS` slots can never block; fewer let
+ * waiting Find Clips runs hold every slot while their own listening waits for
+ * one. Several media workers share the load, so the boot only warns.
+ */
+export function mediaSlotShortfall(
+  env: Pick<
+    WorkerEnv,
+    'WORKER_ROLES' | 'WORKER_MEDIA_CONCURRENCY' | 'CLIPS_MEDIA_SLOTS' | 'CLIPS_MEDIA_PY_SLOTS'
+  >,
+): number {
+  if (!env.WORKER_ROLES.includes('media')) return 0;
+  const needed = env.CLIPS_MEDIA_SLOTS + env.CLIPS_MEDIA_PY_SLOTS;
+  return Math.max(0, needed - env.WORKER_MEDIA_CONCURRENCY);
+}
+
 /** How quickly a clip activity hears a cancel. */
 export const CLIP_HEARTBEAT_THROTTLE: Duration = '5 seconds';
 
@@ -121,7 +140,10 @@ export function workerPlan(
  * clips without text still export, and one with text fails `font_missing`.
  * An unreadable or old manifest stops a render worker (the build must be rerun).
  */
-async function loadClipFonts(env: WorkerEnv, roles: { render: boolean }): Promise<FontsFolder | null> {
+async function loadClipFonts(
+  env: WorkerEnv,
+  roles: { render: boolean },
+): Promise<FontsFolder | null> {
   const dir = fontsDirFrom(env);
   if (!dir) {
     if (roles.render) {
@@ -175,7 +197,8 @@ export async function bootClips(
   await mkdir(scratchRoot, { recursive: true });
   // Module 19: job folders a crash left behind (idle for two hours) go before any job runs.
   const cleared = await clearStaleScratch(scratchRoot);
-  if (cleared > 0) console.log(`[clips] Removed ${cleared} scratch folders left by an earlier crash.`);
+  if (cleared > 0)
+    console.log(`[clips] Removed ${cleared} scratch folders left by an earlier crash.`);
 
   const simulation = clipsSimulated(env);
   // Module 20: with YTDLP_SELF_UPDATE, jobs use an updated copy of yt-dlp from the scratch folder.

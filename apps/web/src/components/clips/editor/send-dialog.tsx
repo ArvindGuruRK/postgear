@@ -56,6 +56,8 @@ import type { ChannelsResponse, ProviderSummary } from '@/types/channel';
 import type { ClipExportView, ClipJobView } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
 import { useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
+import { jobWords, WAITING_WORDS } from '../waiting-words';
 import { EXPORT_FAILED_SENTENCE, timeLeft } from './export-model';
 import {
   CAPTION_MAX,
@@ -308,7 +310,8 @@ function SendClipContent({ orgId, clip, outdated, exportRun, onSent }: SendClipD
         {onExportStep ? (
           <ExportStep
             exporting={exporting}
-            stageLabel={live ? job.stageLabel : null}
+            stageLabel={live ? jobWords(job) : null}
+            waitingJob={live ? job : null}
             progress={live ? job.progress : 0}
             etaSeconds={live ? job.etaSeconds : null}
             // From a card, the last export's quality is read first.
@@ -546,6 +549,7 @@ function ExportStep({
   exporting,
   canExport,
   stageLabel,
+  waitingJob,
   progress,
   etaSeconds,
   onExport,
@@ -555,6 +559,8 @@ function ExportStep({
   exporting: boolean;
   canExport: boolean;
   stageLabel: string | null;
+  /** Module 15: the live job, for the low priority line while it waits. */
+  waitingJob: Pick<ClipJobView, 'status' | 'waiting'> | null;
   progress: number;
   etaSeconds: number | null;
   onExport: () => void;
@@ -571,11 +577,12 @@ function ExportStep({
       {exporting ? (
         <div className="flex flex-col gap-2" data-testid="clip-send-exporting">
           <div className="flex items-center justify-between gap-3 font-sans text-sm text-ink">
-            <span className="type-ui">{stageLabel ?? 'Waiting for its turn'}</span>
+            <span className="type-ui">{stageLabel ?? WAITING_WORDS}</span>
             <span className="tabular-nums type-muted">{Math.round(progress)}%</span>
           </div>
-          <Progress value={progress} aria-label={stageLabel ?? 'Waiting for its turn'} />
+          <Progress value={progress} aria-label={stageLabel ?? WAITING_WORDS} />
           {left ? <p className="m-0 font-sans text-sm text-ink type-muted">{left}</p> : null}
+          <WaitingNote job={waitingJob} className="m-0 font-sans text-sm text-ink type-muted" />
           <Button variant="secondary" size="sm" className="w-fit" onClick={onCancel}>
             Cancel Export
           </Button>

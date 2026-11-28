@@ -15,6 +15,11 @@
 A stretch with no speech is not an error: it answers no words and
 `noSpeech`, and the caller records it as covered so it is never listened to
 again.
+
+`TRANSCRIBER=auto` (Module 15): a job asking for more sound than the hosted
+lane's threshold goes to the hosted listener; any failure there but a cancel
+hands the whole job to our own machine, logged with ids and counts only. The
+answer's `model` names the listener that actually produced the words.
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, CancelledError
 
 from postgear_media.contract.generated import (
     HeardFile,
@@ -35,11 +40,13 @@ from postgear_media.contract.generated import (
     MediaPyTranscribeOutput,
 )
 from postgear_media.core.keys import assert_valid_clip_key
+from postgear_media.core.logging import get_logger
 from postgear_media.core.scratch import scratch_folder
 from postgear_media.core.storage import PrivateStorage, StorageNotFoundError
 from postgear_media.providers.transcribe.base import (
     Chunk,
     Heard,
+    HostedLane,
     ListenRequest,
     Transcriber,
     Word,
@@ -50,6 +57,11 @@ from postgear_media.services.speech_track import SPEECH_RATE_HZ, speech_values
 #: A real listener's chunks overlap by this much, so a word at a seam is whole in one of them.
 SEAM_OVERLAP_MS = 3_000
 MAX_WORD_CHARS = 80
+
+log = get_logger("transcribe")
+
+#: The caller cancelled (Temporal's own type, raised at a heartbeat): never a reason to fall back.
+Cancelled = CancelledError
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +75,36 @@ class TranscribeDeps:
     checkpoint: Callable[[dict[str, Any] | None], None]
     #: True for the simulated listener: no overlap, and the hint is passed through.
     simulated: bool
+    #: `TRANSCRIBER=auto`: the hosted lane for long jobs; `transcriber` is then
+    #: our own machine, which takes every other job and any hosted failure.
+    hosted: HostedLane | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _Listened:
+    """Every chunk's words in the video's time, and the language first heard."""
+
+    pieces: list[tuple[tuple[int, int], list[Word]]]
+    language: str | None
+    probability: float | None
+
+
+def lane_for(asked_ms: int, deps: TranscribeDeps) -> tuple[Transcriber, Transcriber | None]:
+    """Who listens to a job asking for `asked_ms` of sound, and who takes over if it fails.
+
+    With a hosted lane (`TRANSCRIBER=auto`), a job longer than its threshold goes
+    there with our own machine behind it. Everything else is the bound listener
+    alone: a short job, `faster-whisper`, `groq` and simulation.
+    """
+    hosted = deps.hosted
+    if hosted is not None and asked_ms > hosted.above_ms:
+        return hosted.transcriber, deps.transcriber
+    return deps.transcriber, None
+
+
+def _folder_name(name: str) -> str:
+    """A listener's name as a folder name (`groq:whisper-large-v3-turbo` has a colon)."""
+    return "".join(char if char.isalnum() or char in "-_." else "-" for char in name)
 
 
 def bad_input(message: str) -> ApplicationError:
@@ -189,6 +231,56 @@ def _save_done(path: Path, words: list[Word], heard: Heard) -> None:
     temp.replace(path)
 
 
+def _listen_all(
+    ranges: list[tuple[int, int]],
+    transcriber: Transcriber,
+    deps: TranscribeDeps,
+    *,
+    audio: Path,
+    folder: Path,
+    done_dir: Path,
+    request: tuple[str | None, str | None, str | None],
+) -> _Listened:
+    """Listens to every chunk with one listener, reusing chunks an earlier attempt finished.
+
+    Each listener keeps its finished chunks in its own folder, since two
+    listeners cut the same stretch differently.
+    """
+    language, sample, force = request
+    overlap = 0 if deps.simulated else SEAM_OVERLAP_MS
+    plan = plan_chunks(ranges, transcriber.max_chunk_ms, overlap)
+    pieces: list[tuple[tuple[int, int], list[Word]]] = []
+    found_language: str | None = None
+    probability: float | None = None
+    for index, (from_ms, to_ms) in enumerate(plan):
+        deps.checkpoint({"chunk": index, "of": len(plan)})
+        done_path = done_dir / f"{from_ms}-{to_ms}.json"
+        done = _load_done(done_path)
+        if done is None:
+            chunk = Chunk(path=folder / f"chunk-{index}.wav", from_ms=from_ms, to_ms=to_ms)
+            cut_chunk(audio, chunk.path, from_ms, to_ms)
+            heard = transcriber.listen(
+                ListenRequest(
+                    chunk=chunk,
+                    language=language,
+                    sample=sample,
+                    force=force,
+                    checkpoint=lambda: deps.checkpoint(None),
+                ),
+            )
+            words = _shift(heard, chunk)
+            _save_done(done_path, words, heard)
+            chunk.path.unlink(missing_ok=True)
+            done = (words, heard.language, heard.language_probability)
+        words, chunk_language, chunk_probability = done
+        pieces.append(((from_ms, to_ms), words))
+        if found_language is None and chunk_language and words:
+            found_language = chunk_language
+            probability = chunk_probability
+    deps.checkpoint({"chunk": len(plan), "of": len(plan)})
+    return _Listened(pieces=pieces, language=found_language, probability=probability)
+
+
 def transcribe(payload: MediaPyTranscribeInput, deps: TranscribeDeps) -> MediaPyTranscribeOutput:
     """Listens to the asked stretches and stores the heard file."""
     language = None if payload.language == "auto" else payload.language
@@ -211,46 +303,48 @@ def transcribe(payload: MediaPyTranscribeInput, deps: TranscribeDeps) -> MediaPy
             ) from None
         facts = read_facts(audio_path)
         ranges = checked_ranges(payload, facts.duration_ms)
-        overlap = 0 if deps.simulated else SEAM_OVERLAP_MS
-        plan = plan_chunks(ranges, deps.transcriber.max_chunk_ms, overlap)
+        asked_ms = sum(to_ms - from_ms for from_ms, to_ms in ranges)
+        listener, fallback = lane_for(asked_ms, deps)
 
-        pieces: list[tuple[tuple[int, int], list[Word]]] = []
-        found_language: str | None = None
-        probability: float | None = None
-        for index, (from_ms, to_ms) in enumerate(plan):
-            deps.checkpoint({"chunk": index, "of": len(plan)})
-            done_path = done_dir / f"{from_ms}-{to_ms}.json"
-            done = _load_done(done_path)
-            if done is None:
-                chunk = Chunk(path=folder / f"chunk-{index}.wav", from_ms=from_ms, to_ms=to_ms)
-                cut_chunk(audio_path, chunk.path, from_ms, to_ms)
-                heard = deps.transcriber.listen(
-                    ListenRequest(
-                        chunk=chunk,
-                        language=language,
-                        sample=sample,
-                        force=force,
-                        checkpoint=lambda: deps.checkpoint(None),
-                    ),
-                )
-                words = _shift(heard, chunk)
-                _save_done(done_path, words, heard)
-                chunk.path.unlink(missing_ok=True)
-                done = (words, heard.language, heard.language_probability)
-            words, chunk_language, chunk_probability = done
-            pieces.append(((from_ms, to_ms), words))
-            if found_language is None and chunk_language and words:
-                found_language = chunk_language
-                probability = chunk_probability
-        deps.checkpoint({"chunk": len(plan), "of": len(plan)})
+        def listen_with(transcriber: Transcriber) -> _Listened:
+            return _listen_all(
+                ranges,
+                transcriber,
+                deps,
+                audio=audio_path,
+                folder=folder,
+                done_dir=done_dir / _folder_name(transcriber.name),
+                request=(language, sample, force),
+            )
 
-        words = stitch(pieces)
-        final_language = language or found_language or "en"
+        try:
+            listened = listen_with(listener)
+        except Cancelled:
+            raise
+        except Exception as error:
+            if fallback is None:
+                raise
+            # Ids, counts and a fixed code only: never a word or a message.
+            log.warning(
+                "listen.fallback",
+                job_id=payload.job_id,
+                lane=listener.name,
+                to=fallback.name,
+                reason=getattr(error, "type", None) or type(error).__name__,
+                ranges=len(ranges),
+                seconds=round(asked_ms / 1000),
+            )
+            listener = fallback
+            listened = listen_with(listener)
+
+        words = stitch(listened.pieces)
+        final_language = language or listened.language or "en"
+        probability = listened.probability
         heard_file = HeardFile.model_validate(
             {
                 "version": 1,
                 "language": final_language,
-                "model": deps.transcriber.name,
+                "model": listener.name,
                 "ranges": [{"fromMs": a, "toMs": b} for a, b in ranges]
                 or [{"fromMs": r.from_ms, "toMs": r.to_ms} for r in payload.ranges],
                 "words": [
@@ -275,7 +369,7 @@ def transcribe(payload: MediaPyTranscribeInput, deps: TranscribeDeps) -> MediaPy
             "heardKey": key,
             "language": final_language,
             "languageProbability": None if language else probability,
-            "model": deps.transcriber.name,
+            "model": listener.name,
             "secondsListened": round(sum(b - a for a, b in ranges) / 1000, 3),
             "wordCount": len(words),
             "noSpeech": len(words) == 0,

@@ -10,7 +10,7 @@ import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import type { ClipDrive } from '../videos/clip-drive';
 import type { ClipSampleLink } from '../videos/clip-sample';
 import { ClipsStatusService } from './clips-status.service';
-import type { MediaServiceProbe } from './media-service.probe';
+import { type MediaServiceProbe, NO_HOSTED_LANE } from './media-service.probe';
 import type { MediaVoices } from './media-voices.client';
 
 function status(platforms: string[]) {
@@ -31,7 +31,10 @@ function status(platforms: string[]) {
     } as unknown as ClipLimitsGuard,
     config as never,
     { url: null } as unknown as ClipSampleLink,
-    { state: jest.fn(async () => 'off') } as unknown as MediaServiceProbe,
+    {
+      state: jest.fn(async () => 'off'),
+      hostedLane: jest.fn(async () => NO_HOSTED_LANE),
+    } as unknown as MediaServiceProbe,
     { list: jest.fn() } as unknown as MediaVoices,
     { status: () => ({ available: false }) } as unknown as ClipDrive,
   );

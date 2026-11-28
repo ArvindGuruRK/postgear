@@ -43,7 +43,7 @@ Top bar: Clips                                                                  
 | +-----------------------------------------------------------+
 | | [on ] Captions                 [ Bold Pop v ]             |
 | | [on ] Follow The Speaker                                  |
-| | [off] Look For Action                  +29 AI minutes     |
+| | [off] Look For Action                  +29 AI Minutes     |
 | | [off] Remove Silences                                     |
 | | [on ] Hook Title                                          |
 | +-----------------------------------------------------------+
@@ -190,7 +190,7 @@ Posting Slots: Client A Shorts (YouTube)                                [x]
 | Piece | Use | Notes |
 |---|---|---|
 | Setup choices | `Segmented`, `Toggle`, `Checkbox`, `Select`, `Textarea`, `SummaryBox` | No new pieces |
-| AI buttons and bars | `Button variant="highlight"`, `Progress tone="ai"`, the existing `CreditsChip` showing AI minutes ("38 of 300 AI minutes left") | The only violet |
+| AI buttons and bars | `Button variant="highlight"`, `Progress tone="ai"`, the Clips `AiMinutesChip` ("38 of 300 AI minutes left"; its own chip, never the text and image `CreditsChip`, which counts AI credits) | The only violet |
 | Transcript sheet and pane | `Sheet` (video page), a pane in the editor frame | The pane is part of the frame, not a floating panel |
 | Bulk actions | `BulkActionBar` | Exists in `packages/ui`, first used here in Clips |
 | Sortable montage list | dnd-kit, as `slides-rail.tsx` | |

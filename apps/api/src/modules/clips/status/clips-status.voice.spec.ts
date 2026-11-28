@@ -8,7 +8,7 @@ import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import type { ClipDrive } from '../videos/clip-drive';
 import type { ClipSampleLink } from '../videos/clip-sample';
 import { ClipsStatusService } from './clips-status.service';
-import type { AiServiceState, MediaServiceProbe } from './media-service.probe';
+import { type AiServiceState, type MediaServiceProbe, NO_HOSTED_LANE } from './media-service.probe';
 import type { MediaVoices, SpeakerVoices } from './media-voices.client';
 
 const HEART = { id: 'kokoro-heart', name: 'Heart', languages: ['en'] };
@@ -33,7 +33,10 @@ function status(options: { tts: boolean; service: AiServiceState; voices: Speake
     } as unknown as ClipLimitsGuard,
     config as never,
     { url: null } as unknown as ClipSampleLink,
-    { state: jest.fn(async () => options.service) } as unknown as MediaServiceProbe,
+    {
+      state: jest.fn(async () => options.service),
+      hostedLane: jest.fn(async () => NO_HOSTED_LANE),
+    } as unknown as MediaServiceProbe,
     { list } as unknown as MediaVoices,
     { status: () => ({ available: false }) } as unknown as ClipDrive,
   );

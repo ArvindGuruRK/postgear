@@ -250,7 +250,7 @@ describe('Clips security: Messages', () => {
       for (const stage of [...HOSTILE, 'constructor', 'rendering']) {
         const view = toJobView(jobRow({ kind: 'IMPORT', status: 'RUNNING', stage }));
         expect(view.stage).toBeNull();
-        expect(view.stageLabel).toBe('Waiting for its turn');
+        expect(view.stageLabel).toBe('Waiting for our turn');
       }
       for (const kind of Object.keys(CLIP_JOB_STAGES) as ClipJob['kind'][]) {
         for (const stage of CLIP_JOB_STAGES[kind]) {

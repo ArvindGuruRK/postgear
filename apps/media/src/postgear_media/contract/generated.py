@@ -99,10 +99,15 @@ class Bindings(BaseModel):
         populate_by_name=True,
     )
     faces: Binding
+    hosted_transcriber: Annotated[Binding, Field(alias="hostedTranscriber")]
     motion: Binding
     speaker: Binding
     stills: Binding
     transcriber: Binding
+
+
+class HostedAboveMinutes(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=1440)]
 
 
 class MediaPyHealthOutput(BaseModel):
@@ -113,6 +118,9 @@ class MediaPyHealthOutput(BaseModel):
     bindings: Bindings
     contract_version: Annotated[
         int, Field(alias="contractVersion", ge=1, le=9007199254740991)
+    ]
+    hosted_above_minutes: Annotated[
+        HostedAboveMinutes | None, Field(alias="hostedAboveMinutes")
     ]
     models_present: Annotated[bool, Field(alias="modelsPresent")]
     python_version: Annotated[

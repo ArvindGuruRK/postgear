@@ -16,6 +16,8 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { ClipBatchNoticeService } from './exports/clip-batch-notice.service';
 import { ClipJobsRepository } from './jobs/clip-jobs.repository';
 import { ClipJobsService } from './jobs/clip-jobs.service';
+import { ClipQueueService } from './jobs/clip-queue.service';
+import { ClipSchedulerService } from './jobs/clip-scheduler.service';
 import { ClipLimitsGuard } from './limits/clip-limits.guard';
 import { ClipRetentionService } from './retention/clip-retention.service';
 import { MediaServiceProbe } from './status/media-service.probe';
@@ -31,6 +33,9 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
   providers: [
     ClipJobsRepository,
     ClipJobsService,
+    // Sprint 13, Module 15: the one scheduler and the waiting estimate.
+    ClipSchedulerService,
+    ClipQueueService,
     ClipLimitsGuard,
     ClipPlaybackService,
     ClipVideosRepository,
@@ -50,6 +55,8 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     MediaModule,
     ClipJobsRepository,
     ClipJobsService,
+    ClipSchedulerService,
+    ClipQueueService,
     ClipLimitsGuard,
     ClipPlaybackService,
     ClipVideosRepository,

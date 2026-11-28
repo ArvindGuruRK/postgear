@@ -16,7 +16,9 @@
  *    blends it and deletes the stills when the run ends.
  *
  * No charge here: Look For Action was charged once when the run started, and
- * it costs the same with the still check on or off. Pictures, prompts and
+ * it costs the same with the still check on or off. Module 15: that charge
+ * (`clips.ai:action:<jobId>`) must still stand, or nothing is sent (409
+ * `highlights_failed`), so no picture reaches the model unpaid. Pictures, prompts and
  * answers are never logged: counts and ids only.
  */
 import { HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -30,6 +32,8 @@ import type { ModelImage, StillCheckBurst } from '@postgear/ai-engine';
 import { AI_ENGINE, type AiEngine } from '../../ai/engine/engine.types';
 import { PRIVATE_STORAGE, type PrivateStorage } from '../../media/storage/storage.interface';
 import { ClipErrorException } from '../clip-error.exception';
+import { liveChargeUnder } from '../clips-ai-charges';
+import { actionChargeKey } from './clip-highlights.service';
 import { readSetupParams } from './clip-moments.service';
 
 /** A still larger than this is not a still the media service made. */
@@ -78,6 +82,12 @@ export class ClipStillsService {
       for (const key of burst.stillKeys) {
         if (!isJobStillKey(key, orgId, videoId, jobId)) throw notFound();
       }
+    }
+    // Module 15: pictures go to the model only while the run's Look For Action charge stands
+    // (none made, or given back when the motion measure failed or the run ended).
+    if ((await liveChargeUnder(orgId, actionChargeKey(job.id))) <= 0) {
+      this.logger.warn(JSON.stringify({ event: 'clips.stills.uncharged', jobId: job.id }));
+      throw new ClipErrorException(HttpStatus.CONFLICT, 'highlights_failed');
     }
 
     const writer = this.ai.createSnippetWriter({ orgId });

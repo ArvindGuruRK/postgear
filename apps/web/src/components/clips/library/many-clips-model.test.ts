@@ -77,6 +77,7 @@ function job(overrides: Partial<ClipJobView> = {}): ClipJobView {
     createdAt: '2026-11-27T10:00:00.000Z',
     startedAt: null,
     finishedAt: null,
+    waiting: null,
     ...overrides,
   };
 }

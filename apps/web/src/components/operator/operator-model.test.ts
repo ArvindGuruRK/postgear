@@ -74,11 +74,12 @@ function cellOf(plans: PlansView, tier: Tier, key: Key): PlanCell {
 }
 
 describe('the exact copy', () => {
-  it('names the five tabs and the library views in Title Case', () => {
+  it('names the six tabs and the library views in Title Case', () => {
     expect(Object.values(OPERATOR_TAB_NAMES)).toEqual([
       'Plans',
       'Workspace Overrides',
       'Usage',
+      'Costs',
       'Change Log',
       'Library',
     ]);

@@ -76,5 +76,17 @@ class Transcriber(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class HostedLane:
+    """`TRANSCRIBER=auto`'s fast lane: a hosted listener for long jobs only.
+
+    A job asking for more than `above_ms` of sound goes to `transcriber`; our
+    own machine takes every other job, and takes over when this one fails.
+    """
+
+    transcriber: Transcriber
+    above_ms: int
+
+
 class TranscriberOffError(RuntimeError):
     """The binding cannot run on this box (no library, no key)."""

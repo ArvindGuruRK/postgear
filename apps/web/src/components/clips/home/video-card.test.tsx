@@ -110,11 +110,27 @@ describe('VideoCard', () => {
     expect(cardActions.onSettled).toHaveBeenCalledWith('video-busy');
   });
 
-  it('says a queued job is waiting for its turn, with no time left yet', () => {
+  it('says a queued job is waiting for our turn, with no time left yet', () => {
     renderCard(FIXTURE_CARDS.waiting, actions(), false);
-    expect(screen.getByText('Waiting for its turn')).toBeInTheDocument();
+    expect(screen.getByText('Waiting for our turn')).toBeInTheDocument();
     expect(screen.getByText('0%')).toBeInTheDocument();
     expect(screen.queryByText(/left$/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('clips-waiting-note')).not.toBeInTheDocument();
+  });
+
+  it('says about how long a queued import waits, and why a low priority one waits (Module 15)', () => {
+    const card = {
+      ...FIXTURE_CARDS.waiting,
+      job: {
+        ...(FIXTURE_CARDS.waiting.job as ClipJobView),
+        waiting: { aboutSeconds: 300, position: 4, lowPriority: true },
+      },
+    };
+    renderCard(card, actions(), false);
+    expect(screen.getByText('Waiting for our turn, about 5 minutes')).toBeInTheDocument();
+    expect(screen.getByTestId('clips-waiting-note')).toHaveTextContent(
+      'Plans with a higher priority go first.',
+    );
   });
 
   it('cancels a busy import', async () => {

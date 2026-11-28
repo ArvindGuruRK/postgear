@@ -15,7 +15,10 @@
  *    the signals and writes the clips.
  *
  * No words heard in the stretch: nothing was read, so the reading charge is
- * given back and the run goes on with the signals alone. Rows, the request
+ * given back and the run goes on with the signals alone. Module 15: words to
+ * read but no reading charge left under `clips.ai:read:<jobId>` (none made,
+ * or given back) is a 409 `highlights_failed` before the model is asked, so
+ * no run reads unpaid. Rows, the request
  * and the model's answers are never logged.
  */
 import { HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -39,8 +42,10 @@ import {
 import { AI_ENGINE, type AiEngine } from '../../ai/engine/engine.types';
 import { UsageService } from '../../entitlements/usage.service';
 import { ClipErrorException } from '../clip-error.exception';
+import { liveChargeUnder } from '../clips-ai-charges';
 import { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
+import { readChargeKey } from './clip-highlights.service';
 
 /** Moments titled (and answered) at most. */
 export const TITLED_MOMENTS = 40;
@@ -121,6 +126,13 @@ export class ClipMomentsService {
       // Nothing to read: the reading charge goes back, and the run keeps to the signals.
       if (params.charges.read) await this.usage.reverse(orgId, params.charges.read);
       return { moments: [], noSpeech: true, asked };
+    }
+
+    // Module 15: the model reads only for a run whose reading charge still stands (none made,
+    // or given back with a failed or cancelled run: no reading, no cost to us).
+    if ((await liveChargeUnder(orgId, readChargeKey(job.id))) <= 0) {
+      this.logger.warn(JSON.stringify({ event: 'clips.moments.uncharged', jobId: job.id }));
+      throw new ClipErrorException(HttpStatus.CONFLICT, 'highlights_failed');
     }
 
     const writer = this.ai.createSnippetWriter({ orgId });

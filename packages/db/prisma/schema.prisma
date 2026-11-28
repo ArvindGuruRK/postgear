@@ -2084,11 +2084,16 @@ model ClipJob {
   finishedAt     DateTime?
   /// Downloads and previews.
   expiresAt      DateTime?
+  /// Module 15: what the job cost us, in US cents, from the price table when it ended. Never shown to users.
+  costCents      Int?
+  /// Module 15: the facts the cost came from (seconds of video, seconds run, provider, units, price table date).
+  cost           Json?
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   video          ClipVideo?    @relation(fields: [videoId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, kind, status])
   @@index([status, createdAt])
+  @@index([finishedAt])
   @@index([videoId, kind])
   @@index([clipId, kind])
 }

@@ -55,6 +55,7 @@ export function fixtureJob(overrides: Partial<ClipJobView> = {}): ClipJobView {
     createdAt: NOW,
     startedAt: NOW,
     finishedAt: null,
+    waiting: null,
     ...overrides,
   };
 }
@@ -85,7 +86,7 @@ export const FIXTURE_CARDS: Readonly<
       id: 'job-2',
       status: 'QUEUED',
       stage: null,
-      stageLabel: 'Waiting for its turn',
+      stageLabel: 'Waiting for our turn',
       progress: 0,
       etaSeconds: null,
       videoId: 'video-waiting',

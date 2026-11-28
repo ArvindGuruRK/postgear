@@ -51,6 +51,8 @@ export default async function ClipSetupRoute({
           vision: status?.ai?.actionVision ?? false,
         }}
         faces={status?.ai?.faces ?? false}
+        // Module 15: the privacy hint names the hosted listener only while it is on.
+        hostedLane={status?.ai?.hostedLane ?? null}
       />
     </ClipsDesktopOnly>
   );

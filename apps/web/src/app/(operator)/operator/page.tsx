@@ -6,7 +6,7 @@ import { ApiError, serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
 import type { OperatorTab, PlansView } from '@/types/operator';
 
-const TABS: readonly OperatorTab[] = ['plans', 'overrides', 'usage', 'changes', 'library'];
+const TABS: readonly OperatorTab[] = ['plans', 'overrides', 'usage', 'costs', 'changes', 'library'];
 
 export async function generateMetadata(): Promise<Metadata> {
   await requireOperator();
@@ -14,8 +14,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * `/operator` (Sprint 12, Module 19 Part B): one page with five tabs, Plans,
- * Workspace Overrides, Usage, Change Log and Library. The Plans table is read
+ * `/operator` (Sprint 12, Module 19 Part B): one page with six tabs, Plans,
+ * Workspace Overrides, Usage, Costs (Sprint 13, Module 15), Change Log and
+ * Library. The Plans table is read
  * here on the server so the first paint has it; the other tabs load when
  * opened. A 403 from the API (in production, a superadmin outside
  * `OPERATOR_EMAILS`) is the same 404 as anyone else gets.

@@ -43,6 +43,8 @@ import { getVideoTranscript, listenToVideo } from '@/lib/clips-api';
 import type { TranscriptView } from '@/types/clips';
 import { pricedLabel } from '../panels/captions-model';
 import { useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
+import { queuedOr } from '../waiting-words';
 import {
   clipRangeForWords,
   findInWords,
@@ -322,7 +324,8 @@ export function TranscriptSheet({
           {jobId !== null ? (
             <div className="flex flex-col gap-2" data-testid="clip-video-listening">
               <Progress tone="ai" value={job?.progress ?? 0} aria-label="Listening to this video" />
-              <p className={NOTE}>Listening to what is said</p>
+              <p className={NOTE}>{queuedOr(job, 'Listening to what is said')}</p>
+              <WaitingNote job={job} className={NOTE} />
             </div>
           ) : null}
 

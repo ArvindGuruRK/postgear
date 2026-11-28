@@ -299,8 +299,10 @@ describe('Row: channels added (clips.browse_channels, channel_limit)', () => {
 
 describe('Row: concurrency and order (no refusal, the job waits)', () => {
   it('is wired: the cap and the priority come from the resolver', () => {
+    // Sprint 13, Module 15: the cap is read by the one scheduler at each pass.
+    const scheduler = source('jobs/clip-scheduler.service.ts');
+    expect(scheduler).toContain("this.resolver.get(orgId, 'clips.concurrent_imports')");
     const jobs = source('jobs/clip-jobs.service.ts');
-    expect(jobs).toContain("this.resolver.get(orgId, 'clips.concurrent_imports')");
     expect(jobs).toContain("'clips.queue_priority'");
   });
 });

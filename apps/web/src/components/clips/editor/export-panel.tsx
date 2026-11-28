@@ -69,6 +69,8 @@ import { useEntitlements } from '@/lib/entitlements';
 import type { ClipExportView, ClipPreviewView, ClipSharpState } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
 import { type ClipJobState, useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
+import { jobWords } from '../waiting-words';
 import {
   changedSince,
   EXPORT_FAILED_SENTENCE,
@@ -449,11 +451,12 @@ export function ExportPanel({
       {live ? (
         <div className="flex flex-col gap-2" data-testid="clip-export-progress">
           <div className="flex items-center justify-between gap-3 font-sans text-sm text-ink">
-            <span className="type-ui">{live.stageLabel}</span>
+            <span className="type-ui">{jobWords(live)}</span>
             <span className="tabular-nums type-muted">{Math.round(live.progress)}%</span>
           </div>
-          <Progress value={live.progress} aria-label={live.stageLabel} />
+          <Progress value={live.progress} aria-label={jobWords(live)} />
           {timeLeft(live.etaSeconds) ? <p className={NOTE}>{timeLeft(live.etaSeconds)}</p> : null}
+          <WaitingNote job={live} className={NOTE} />
           <Button
             variant="secondary"
             size="sm"

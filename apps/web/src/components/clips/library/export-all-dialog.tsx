@@ -45,6 +45,8 @@ import { useEntitlements } from '@/lib/entitlements';
 import type { ClipListItem } from '@/types/clips';
 import type { ClipExportBatchJob, ClipExportBatchView } from '@/types/clips-batch';
 import { qualityTileOptions } from '../editor/quality-tiles';
+import { WaitingNote } from '../waiting-note';
+import { jobWords } from '../waiting-words';
 import { clipFacts } from '../video/video-clip-list';
 import {
   batchCounts,
@@ -338,14 +340,15 @@ function BatchRow({ row }: { row: ClipExportBatchJob }) {
           className="m-0 font-sans text-xs text-ink type-muted"
           data-testid="clips-export-all-stage"
         >
-          {row.job?.stageLabel ?? WAITING_LABEL}
+          {jobWords(row.job, WAITING_LABEL)}
         </p>
       ) : null}
+      {state === 'waiting' ? <WaitingNote job={row.job} /> : null}
       {state === 'running' || state === 'waiting' ? (
         <Progress
           value={progress}
           size="sm"
-          aria-label={`${row.clipTitle}, ${row.job?.stageLabel ?? WAITING_LABEL}`}
+          aria-label={`${row.clipTitle}, ${jobWords(row.job, WAITING_LABEL)}`}
         />
       ) : null}
       {state === 'failed' ? (

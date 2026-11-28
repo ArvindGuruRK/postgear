@@ -445,6 +445,20 @@ const envSchema = z
     // fair queue picks the next by `clips.queue_priority`, then by turns.
     // Match it to the render workers' total slots (RENDER_CONCURRENCY each).
     CLIPS_RENDER_SLOTS: blankAsUnset(z.coerce.number().int().min(1).max(64).default(2)),
+    // Sprint 13, Module 15: the scheduler's other two classes, across every
+    // workspace. CLIPS_MEDIA_SLOTS: media jobs (imports, sharp ranges, Find
+    // Clips, downloads, Auto-Edit, emotes) handed to the media workers at
+    // once; 4, since many of them mostly wait (a Find Clips run on its
+    // listening, a download on the network) rather than load the processor.
+    // CLIPS_MEDIA_PY_SLOTS: Python jobs (listening, faces, voices) at once; 2,
+    // since the Python service runs one activity at a time and a second one
+    // ready keeps it busy. Give the media workers at least CLIPS_MEDIA_SLOTS +
+    // CLIPS_MEDIA_PY_SLOTS slots in all (WORKER_MEDIA_CONCURRENCY each): a
+    // waiting Find Clips run keeps its worker slot, and a Python job's short
+    // steps run on postgear-media too, so fewer can stall a listen behind the
+    // runs waiting for it.
+    CLIPS_MEDIA_SLOTS: blankAsUnset(z.coerce.number().int().min(1).max(64).default(4)),
+    CLIPS_MEDIA_PY_SLOTS: blankAsUnset(z.coerce.number().int().min(1).max(64).default(2)),
     // In production only these addresses count as platform operators (the
     // entitlement screens, the library, removal). Ignored in development.
     OPERATOR_EMAILS: blankAsUnset(commaList(z.string().trim().toLowerCase().email()).default('')),

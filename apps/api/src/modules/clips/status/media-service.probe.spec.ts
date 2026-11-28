@@ -1,6 +1,6 @@
 import type { ConfigService } from '@nestjs/config';
 import type { Env } from '../../../config/env';
-import { MediaServiceProbe } from './media-service.probe';
+import { MediaServiceProbe, NO_HOSTED_LANE } from './media-service.probe';
 
 function probe(values: Partial<Record<keyof Env, string>> = {}) {
   const config = {
@@ -70,6 +70,42 @@ describe('MediaServiceProbe', () => {
     release({ ok: true });
     await expect(answers).resolves.toEqual(['ok', 'ok', 'ok']);
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the hosted lane from the same /ready answer, in one request', async () => {
+    const { instance } = probe();
+    const fetcher = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ready: true,
+        checks: { worker: 'running' },
+        hostedLane: { provider: 'groq', aboveMinutes: 55 },
+      }),
+    });
+    instance.fetcher = fetcher;
+    const [state, lane] = await Promise.all([instance.state(), instance.hostedLane()]);
+    expect(state).toBe('ok');
+    expect(lane).toEqual({ on: true, provider: 'groq', providerName: 'Groq', aboveMinutes: 55 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no hosted lane when the service is off, or its answer cannot be read', async () => {
+    const { instance, advance } = probe();
+    instance.fetcher = jest.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ hostedLane: { provider: 'groq', aboveMinutes: 55 } }),
+    });
+    await expect(instance.hostedLane()).resolves.toEqual(NO_HOSTED_LANE);
+    advance(6_000);
+    instance.fetcher = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('Unexpected token');
+      },
+    });
+    // A body that cannot be read never turns a ready service off.
+    await expect(instance.state()).resolves.toBe('ok');
+    await expect(instance.hostedLane()).resolves.toEqual(NO_HOSTED_LANE);
   });
 
   it('sends no header when no token is set (local only)', async () => {

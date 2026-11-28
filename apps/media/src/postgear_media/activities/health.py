@@ -10,6 +10,7 @@ from postgear_media.activities.base import answer, logged, parse_input
 from postgear_media.contract.generated import (
     Binding,
     Bindings,
+    HostedAboveMinutes,
     MediaPyHealthInput,
     MediaPyHealthOutput,
     VoiceInfo,
@@ -49,9 +50,28 @@ def health_report(settings: Settings) -> MediaPyHealthOutput:
             motion=_binding(table.motion),
             stills=_binding(table.stills),
             speaker=_binding(table.speaker),
+            hosted_transcriber=_binding(table.hosted_transcriber),
         ),
         models_present=table.models_present,
+        hosted_above_minutes=(
+            None
+            if table.hosted_above_minutes is None
+            else HostedAboveMinutes(table.hosted_above_minutes)
+        ),
     )
+
+
+def hosted_lane(settings: Settings) -> dict[str, Any] | None:
+    """`/ready`'s `hostedLane` (Module 15): which hosted listener long speech goes to, or None.
+
+    Read by the API for `ai.hostedLane` in `GET /clips/status`, so the privacy
+    text names the provider only while sound can leave our servers. The
+    provider's name and the threshold only, never the key.
+    """
+    table = build_provider_table(settings)
+    if table.hosted_transcriber.state != "live" or table.hosted_above_minutes is None:
+        return None
+    return {"provider": table.hosted_transcriber.name, "aboveMinutes": table.hosted_above_minutes}
 
 
 def _voice(voice: Voice) -> VoiceInfo:

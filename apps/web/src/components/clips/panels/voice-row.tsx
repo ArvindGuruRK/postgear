@@ -49,6 +49,8 @@ import {
   type Problem,
   problemOf,
 } from './ai-effects-deps';
+import { WaitingNote } from '../waiting-note';
+import { jobWords } from '../waiting-words';
 import { ProblemAlert } from './bleep-row';
 import { PreviewButton } from './sound-rows';
 
@@ -245,7 +247,8 @@ export function VoiceRow({
       {jobId !== null ? (
         <div className="flex flex-col gap-2" data-testid="clip-voice-progress">
           <Progress tone="ai" value={current?.progress ?? 0} aria-label={VOICE_MAKING} />
-          <p className={NOTE}>{current?.stageLabel ?? VOICE_MAKING}</p>
+          <p className={NOTE}>{jobWords(current, VOICE_MAKING)}</p>
+          <WaitingNote job={current} className={NOTE} />
           <Button
             variant="secondary"
             size="sm"

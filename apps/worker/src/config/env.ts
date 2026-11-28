@@ -176,8 +176,18 @@ const envSchema = z
         .refine((roles) => roles.length > 0, 'WORKER_ROLES needs at least one role')
         .default('publishing,media,render'),
     ),
-    // How many media activities run at once (downloads and FFmpeg imports).
-    WORKER_MEDIA_CONCURRENCY: blankAsUnset(z.coerce.number().int().min(1).max(16).default(2)),
+    // How many media activities run at once (downloads, FFmpeg imports, and the
+    // short steps of every Clips job). Sprint 13, Module 15: the API's scheduler
+    // now decides how many jobs run (CLIPS_MEDIA_SLOTS, CLIPS_MEDIA_PY_SLOTS), so
+    // this is sized to never block them: at least their sum (4 + 2), because a
+    // Find Clips or Auto-Edit run keeps its slot while it waits for its listening,
+    // and that listening's own steps need a slot here too. Fewer can stall a
+    // listen behind the very runs waiting for it; `mediaSlotShortfall` warns.
+    WORKER_MEDIA_CONCURRENCY: blankAsUnset(z.coerce.number().int().min(1).max(16).default(6)),
+    // The API's scheduler slots (read here only to check the line above; the
+    // defaults mirror apps/api/src/config/env.ts).
+    CLIPS_MEDIA_SLOTS: blankAsUnset(z.coerce.number().int().min(1).max(64).default(4)),
+    CLIPS_MEDIA_PY_SLOTS: blankAsUnset(z.coerce.number().int().min(1).max(64).default(2)),
     // Renders are CPU bound: one at a time unless the machine is sized for more.
     RENDER_CONCURRENCY: blankAsUnset(z.coerce.number().int().min(1).max(8).default(1)),
 

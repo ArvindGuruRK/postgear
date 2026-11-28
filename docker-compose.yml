@@ -148,8 +148,68 @@ services:
     stop_grace_period: 1m
     restart: "no"
 
+  # The media image (Sprint 13, Module 15: infra/docker/Dockerfile.media), the
+  # Python media service, run beside the worker image against the services
+  # above. Never started by a plain `docker compose up`: it has its own profile.
+  #
+  #   docker compose --profile media-image up -d --build media
+  #   docker compose --profile media-image up -d --build worker media   (both images)
+  #
+  # Stop the local Python service (`npm run dev:media`) first: it holds port
+  # 8100 and polls the same postgear-media-py queue. The host API keeps
+  # MEDIA_URL=http://localhost:8100 and reaches this container there. Settings
+  # come from the root .env with the token (MEDIA_INTERNAL_TOKEN) as it is
+  # there, the addresses changed to these services and the image's folders
+  # kept. It answers from recorded files and never downloads a model, calls
+  # Groq or reads a real video, whatever .env says: MEDIA_SIMULATION and
+  # CLIPS_SIMULATION stay true unless a MEDIA_IMAGE_* name says otherwise in
+  # the shell (never put those names in .env). MEDIA_IMAGE_TARGET=full builds
+  # the image with the model libraries; MEDIA_IMAGE_PORT and
+  # MEDIA_IMAGE_RUN_WORKER=false run it beside a host service without taking
+  # its port or its queue (a health check only). Local storage is shared with
+  # the host API by mounting its two upload folders; models live in the
+  # media_models volume, filled by hand (docs/launch-readiness/06-clips-and-clips-ai.md).
+  media:
+    profiles: ["media-image"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.media
+      target: "${MEDIA_IMAGE_TARGET:-slim}"
+    image: "postgear-media:${MEDIA_IMAGE_TARGET:-slim}"
+    container_name: postgear_media
+    depends_on:
+      temporal:
+        condition: service_started
+      minio:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      TEMPORAL_HOST: temporal:7233
+      S3_ENDPOINT: http://minio:9000
+      UPLOAD_DIRECTORY: /app/apps/api/uploads
+      MEDIA_URL: http://0.0.0.0:8100
+      MEDIA_SCRATCH_DIR: /var/lib/postgear/media-scratch
+      MEDIA_MODEL_DIR: /var/lib/postgear/media-models
+      MEDIA_VOICE_PROGRAM: /app/apps/media/voice-program/.venv/bin/postgear-voice
+      MEDIA_SIMULATION: "${MEDIA_IMAGE_MEDIA_SIMULATION:-true}"
+      CLIPS_SIMULATION: "${MEDIA_IMAGE_CLIPS_SIMULATION:-true}"
+      MEDIA_RUN_WORKER: "${MEDIA_IMAGE_RUN_WORKER:-true}"
+    ports:
+      - "127.0.0.1:${MEDIA_IMAGE_PORT:-8100}:8100"
+    volumes:
+      - media_scratch:/var/lib/postgear/media-scratch
+      - media_models:/var/lib/postgear/media-models
+      - ./apps/api/uploads:/app/apps/api/uploads
+      - ./apps/api/uploads-private:/app/apps/api/uploads-private
+    stop_grace_period: 2m
+    restart: "no"
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   worker_scratch:
+  media_scratch:
+  media_models:

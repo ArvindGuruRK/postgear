@@ -1,38 +1,52 @@
 # syntax=docker/dockerfile:1.7
 #
-# PostGear media image (Sprint 13, Module 01): the Python media service
+# PostGear media image (Sprint 13, Modules 01 and 15): the Python media service
 # (apps/media), FastAPI on 8100 and a Temporal worker on postgear-media-py.
 #
-#   docker build -f infra/docker/Dockerfile.media -t postgear-media:local .
-#   docker build -f infra/docker/Dockerfile.media --build-arg GROUPS=ml -t postgear-media:ml .
-#   docker build -f infra/docker/Dockerfile.media --build-arg VOICE=kokoro -t postgear-media:voice .
+#   docker build -f infra/docker/Dockerfile.media --target slim -t postgear-media:slim .
+#   docker build -f infra/docker/Dockerfile.media --target full -t postgear-media:full .
+#   docker build -f infra/docker/Dockerfile.media --target full --build-arg VOICE=kokoro -t postgear-media:full-voice .
+#   docker compose --profile media-image up -d media        (local services, see docker-compose.yml)
 #
-# Two variants from one file:
-# - slim (the default): the base packages only. Enough for MEDIA_SIMULATION,
-#   which answers every activity from recorded files. No model library.
-# - full (`--build-arg GROUPS=ml`): adds the `ml` dependency group (speech to
-#   text, faces, motion). No PyTorch, no graphics card libraries.
-# - `--build-arg VOICE=kokoro` (either variant) adds the voice program
+# Two named targets from one file (a plain build with no --target is `slim`):
+# - slim: the base packages only (FastAPI, Pydantic, Temporal's SDK, boto3,
+#   httpx, structlog). Enough for MEDIA_SIMULATION, which answers every
+#   activity from recorded files, and for TRANSCRIBER=groq (the hosted lane
+#   only). No model library: faces, motion, stills and our own listening are
+#   `off` here, with a plain reason.
+# - full: slim plus the `ml` dependency group (faster-whisper on CTranslate2,
+#   onnxruntime, PyAV, OpenCV headless, NumPy, MediaPipe). Our own listening
+#   and faces run here, and TRANSCRIBER=auto needs it. No PyTorch and no
+#   graphics card libraries: a card, when there is one, is a later image
+#   (docs/launch-readiness/06-clips-and-clips-ai.md).
+# - `--build-arg VOICE=kokoro` (either target) adds the voice program
 #   (apps/media/voice-program, Module 09) in its own environment beside the
 #   service's. It is GPL-3.0-or-later (espeak-ng inside it), and the service
 #   only runs it as a separate program. Like the worker image's FFmpeg, keep an
 #   image with it in a private registry. Without it the voice is `off`.
 #
-# Model files are never in the image: MEDIA_MODEL_DIR is a volume, filled once
-# at deploy (Module 15). The image runs as a non-root user and needs only the
-# scratch and model volumes to be writable.
+# Model files are never in the image and never fetched when it starts:
+# MEDIA_MODEL_DIR is a volume an operator fills once at deploy (the steps are
+# in docs/launch-readiness/06-clips-and-clips-ai.md), and NODE_ENV=production
+# loads models from local files only, so a missing model fails loudly instead
+# of reaching out. The image runs as a non-root user (uid 10002) and needs
+# only the scratch and model volumes to be writable. /licenses holds the
+# project's note, every installed package with its licence (written at build
+# time from installed metadata, no network) and, with VOICE=kokoro, the GPL.
 #
 # The uv recipe is the one in uv's Docker guide: the pinned uv binary copied
 # in, dependencies synced from the lockfile alone as their own layer, then the
-# project, then only the finished .venv copied into the final stage.
+# project, then only the finished environments copied into the final stage.
 
 ARG PYTHON_IMAGE=python:3.13-slim-bookworm
 ARG UV_VERSION=0.13.10
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
-FROM ${PYTHON_IMAGE} AS build
-ARG GROUPS=""
+# ---------------------------------------------------------------------------
+# Build: the slim environment, then the full one on top of it.
+# ---------------------------------------------------------------------------
+FROM ${PYTHON_IMAGE} AS build-slim
 ARG VOICE=""
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -44,11 +58,11 @@ WORKDIR /app/apps/media
 # Dependencies first: this layer changes only when the lockfile does.
 COPY apps/media/pyproject.toml apps/media/uv.lock apps/media/.python-version apps/media/README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project ${GROUPS:+--group ${GROUPS}}
+    uv sync --locked --no-install-project
 
 COPY apps/media/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked ${GROUPS:+--group ${GROUPS}}
+    uv sync --locked
 
 # The voice program's own environment (empty unless VOICE=kokoro).
 COPY apps/media/voice-program ./voice-program
@@ -56,21 +70,43 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     if [ "$VOICE" = "kokoro" ]; then uv sync --locked --no-editable --project voice-program; \
     else mkdir -p voice-program/.venv; fi
 
+# The licences folder: the project's note, the README, and each environment's
+# packages read from their installed metadata.
+COPY infra/docker/media/licenses/ /out/licenses/
+COPY apps/media/scripts/write_licences.py ./scripts/write_licences.py
+RUN .venv/bin/python scripts/write_licences.py --out /out/licenses/python-packages.md \
+      --title "Python packages in the media service (slim)" \
+ && if [ "$VOICE" = "kokoro" ]; then \
+      install -D -m 0644 voice-program/COPYING /out/licenses/voice-program/COPYING \
+      && voice-program/.venv/bin/python scripts/write_licences.py \
+           --out /out/licenses/voice-program/python-packages.md \
+           --title "Python packages in the voice program"; \
+    fi
+
+FROM build-slim AS build-full
+# The `ml` group on top of the slim environment: the model libraries only.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --group ml
+# Fails the build when a model library cannot be imported here (a missing
+# system library, a second OpenCV build). Imports only: no model is loaded.
+RUN .venv/bin/python -c "import ctranslate2, cv2, faster_whisper, mediapipe, numpy" \
+ && .venv/bin/python scripts/write_licences.py --out /out/licenses/python-packages.md \
+      --title "Python packages in the media service (full)"
+
+# ---------------------------------------------------------------------------
+# Runtime: one base, then the two targets.
+# ---------------------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS runtime
-# tini reaps anything a library starts; curl is the health check's only tool.
+# tini reaps anything a library starts. The health check uses Python itself,
+# so no HTTP client is installed.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tini curl \
+ && apt-get install -y --no-install-recommends tini \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --gid 10002 postgear \
  && useradd --uid 10002 --gid 10002 --create-home --shell /usr/sbin/nologin postgear \
  && install -d -o postgear -g postgear /var/lib/postgear/media-scratch /var/lib/postgear/media-models
 
 WORKDIR /app/apps/media
-COPY --from=build --chown=postgear:postgear /app/apps/media/.venv ./.venv
-COPY --from=build --chown=postgear:postgear /app/apps/media/src ./src
-COPY --from=build --chown=postgear:postgear /app/apps/media/voice-program/.venv ./voice-program/.venv
-# The recorded answers MEDIA_SIMULATION reads are part of the package (src/postgear_media/simulation).
-
 ENV PATH="/app/apps/media/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -81,11 +117,26 @@ ENV PATH="/app/apps/media/.venv/bin:${PATH}" \
     MEDIA_VOICE_PROGRAM=/app/apps/media/voice-program/.venv/bin/postgear-voice
 
 VOLUME ["/var/lib/postgear/media-scratch", "/var/lib/postgear/media-models"]
-USER postgear
 EXPOSE 8100
 
+# `/health` is open and touches nothing; readiness (`/ready`) needs the token.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:8100/health || exit 1
+  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=4).read()"]
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["uvicorn", "postgear_media.main:app", "--host", "0.0.0.0", "--port", "8100", "--no-access-log"]
+
+FROM runtime AS full
+COPY --from=build-full --chown=postgear:postgear /app/apps/media/.venv ./.venv
+COPY --from=build-full --chown=postgear:postgear /app/apps/media/src ./src
+COPY --from=build-full --chown=postgear:postgear /app/apps/media/voice-program/.venv ./voice-program/.venv
+COPY --from=build-full /out/licenses/ /licenses/
+USER postgear
+
+# Last, so a build with no --target is the slim one.
+FROM runtime AS slim
+COPY --from=build-slim --chown=postgear:postgear /app/apps/media/.venv ./.venv
+COPY --from=build-slim --chown=postgear:postgear /app/apps/media/src ./src
+COPY --from=build-slim --chown=postgear:postgear /app/apps/media/voice-program/.venv ./voice-program/.venv
+COPY --from=build-slim /out/licenses/ /licenses/
+USER postgear

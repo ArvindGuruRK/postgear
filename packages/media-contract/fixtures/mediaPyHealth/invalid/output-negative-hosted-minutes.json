@@ -1,0 +1,17 @@
+{
+  "contractVersion": 1,
+  "serviceVersion": "0.1.0",
+  "pythonVersion": "3.13.18",
+  "simulation": false,
+  "taskQueue": "postgear-media-py",
+  "bindings": {
+    "transcriber": { "state": "live", "name": "auto" },
+    "faces": { "state": "off", "name": "mediapipe" },
+    "motion": { "state": "live", "name": "opencv" },
+    "stills": { "state": "live", "name": "opencv" },
+    "speaker": { "state": "live", "name": "kokoro" },
+    "hostedTranscriber": { "state": "live", "name": "groq" }
+  },
+  "modelsPresent": true,
+  "hostedAboveMinutes": -1
+}

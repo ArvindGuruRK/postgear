@@ -22,7 +22,9 @@
  * `GET /clips/emotes/:jobId` answers the job and, once it is done, each file
  * with a five minute signed address named after the file. The files live 24
  * hours (`expiresAt`, set when the row is made; the orphan sweep removes the
- * objects), after which the files are listed without addresses.
+ * objects), after which the files are listed without addresses. They go
+ * with their video (`removeVideo` deletes the folder), and a removed video's
+ * emotes are answered the same way, as expired with no address (Module 15).
  *
  * Logs carry ids and counts only.
  */
@@ -186,7 +188,12 @@ export class ClipEmotesService {
   }
 
   private async resultOf(job: ClipJob, output: EmoteJobOutput): Promise<EmoteResultView> {
-    const expired = job.expiresAt !== null && job.expiresAt.getTime() <= this.timing.now();
+    // Module 15: a removed video's emotes went with it, so they are listed, never linked.
+    const videoGone =
+      job.videoId === null ||
+      (await this.videos.findLive(job.organizationId, job.videoId)) === null;
+    const expired =
+      videoGone || (job.expiresAt !== null && job.expiresAt.getTime() <= this.timing.now());
     const link = async (name: string): Promise<string | null> => {
       if (expired) return null;
       const dot = name.lastIndexOf('.');

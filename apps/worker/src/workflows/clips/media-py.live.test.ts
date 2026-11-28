@@ -69,12 +69,16 @@ describeLive('a TypeScript workflow calls the Python media service', () => {
     expect(report.mediaPy?.contractVersion).toBe(1);
     expect(Object.keys(report.mediaPy?.bindings ?? {}).sort()).toEqual([
       'faces',
+      'hostedTranscriber',
       'motion',
+      'speaker',
       'stills',
       'transcriber',
     ]);
     // The same shape the contract's fixtures pin, rebuilt from the report's parts.
-    expect(mediaPyHealthOutput.shape.taskQueue.parse(MEDIA_PY_TASK_QUEUE)).toBe('postgear-media-py');
+    expect(mediaPyHealthOutput.shape.taskQueue.parse(MEDIA_PY_TASK_QUEUE)).toBe(
+      'postgear-media-py',
+    );
   });
 });
 

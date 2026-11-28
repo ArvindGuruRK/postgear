@@ -32,7 +32,7 @@ describe('CreditsChip', () => {
   it('shows what is left, with the numbers on its test id', () => {
     render(<CreditsChip credits={credits} failed={false} onRetry={() => {}} testId="chip" />);
     const chip = screen.getByTestId('chip');
-    expect(chip.textContent).toBe('70 of 100 credits left');
+    expect(chip.textContent).toBe('70 of 100 AI credits left');
     expect(chip.getAttribute('data-used')).toBe('30');
     expect(screen.queryByText('Running low.')).toBeNull();
   });

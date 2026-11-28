@@ -126,27 +126,10 @@ const fakePrisma = {
     }),
   },
   clipJob: {
-    findMany: jest.fn(
-      async ({
-        where,
-      }: {
-        where: {
-          organizationId: string;
-          OR: Array<{ videoId?: string; clipId?: { in: string[] } }>;
-        };
-      }) =>
-        db.jobs.filter(
-          (job) =>
-            job.organizationId === where.organizationId &&
-            (job.status === 'QUEUED' || job.status === 'RUNNING') &&
-            where.OR.some(
-              (part) =>
-                (part.videoId !== undefined && job.videoId === part.videoId) ||
-                (part.clipId !== undefined &&
-                  job.clipId !== null &&
-                  part.clipId.in.includes(job.clipId)),
-            ),
-        ),
+    // The open jobs to stop (`status: { in }` and an `OR` of the video and its clips),
+    // and Module 15's emotes of the video (`kind: 'EMOTE'`, which these rows never are).
+    findMany: jest.fn(async ({ where }: { where: Record<string, unknown> }) =>
+      db.jobs.filter((job) => pick(job, where)),
     ),
   },
   $transaction: jest.fn(

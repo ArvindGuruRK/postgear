@@ -55,6 +55,8 @@ import { timeLeft } from '../editor/export-model';
 import { AI_MINUTES_METER, AiMinutesChipView } from '../home/clips-meters';
 import { clipErrorSentence } from '../library/clip-actions';
 import { useClipJob } from '../use-clip-job';
+import { WaitingNote } from '../waiting-note';
+import { jobWords } from '../waiting-words';
 import {
   asksFirst,
   findAgainSentence,
@@ -156,17 +158,14 @@ export function FindClips({
       {running ? (
         <div className="flex flex-col gap-2" data-testid="find-clips-progress">
           <div className="flex items-center justify-between gap-3 font-sans text-sm text-ink">
-            <span className="type-ui">{live?.stageLabel ?? 'Waiting for its turn'}</span>
+            <span className="type-ui">{jobWords(live)}</span>
             <span className="tabular-nums type-muted">{Math.round(live?.progress ?? 0)}%</span>
           </div>
-          <Progress
-            value={live?.progress ?? 0}
-            tone="ai"
-            aria-label={live?.stageLabel ?? 'Waiting for its turn'}
-          />
+          <Progress value={live?.progress ?? 0} tone="ai" aria-label={jobWords(live)} />
           {timeLeft(live?.etaSeconds ?? null) ? (
             <p className={NOTE}>{timeLeft(live?.etaSeconds ?? null)}</p>
           ) : null}
+          <WaitingNote job={live} className={NOTE} />
           <Button variant="secondary" size="sm" className="w-fit" onClick={() => void cancel()}>
             Cancel
           </Button>

@@ -9,7 +9,9 @@
     "faces": { "state": "off", "name": "mediapipe" },
     "motion": { "state": "live", "name": "opencv" },
     "stills": { "state": "live", "name": "opencv" },
-    "speaker": { "state": "live", "name": "kokoro" }
+    "speaker": { "state": "live", "name": "kokoro" },
+    "hostedTranscriber": { "state": "off", "name": "groq" }
   },
-  "modelsPresent": true
+  "modelsPresent": true,
+  "hostedAboveMinutes": null
 }

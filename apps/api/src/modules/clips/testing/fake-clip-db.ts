@@ -10,7 +10,8 @@
  * relations `video` (one) and `posts` (`some` and `none`); Module 17 adds
  * `gte`, `lte` and `contains` (case-insensitive), `ClipPost` writes, and a
  * post's channel (`integration`); Module 11 adds a JSON path's
- * `array_contains`. A filter it does not know throws, so a
+ * `array_contains`; Sprint 13, Module 15 adds `lt` (the reconcile's lists).
+ * A filter it does not know throws, so a
  * spec can never pass by ignoring part of a query.
  *
  * Test-only: nothing outside a `*.spec.ts` imports this file.
@@ -137,11 +138,11 @@ function matchesScalar(row: Row, actual: unknown, filter: unknown): boolean {
       } else if (!same(actual, expected)) return false;
     } else if (op === 'mode') {
       // `contains` below is always case-insensitive, the only mode these services use.
-    } else if (op === 'gte' || op === 'lte') {
+    } else if (op === 'gte' || op === 'lte' || op === 'lt') {
       if (actual === null || actual === undefined) return false;
       const a = actual instanceof Date ? actual.getTime() : (actual as number);
       const b = operand instanceof Date ? operand.getTime() : (operand as number);
-      if (op === 'gte' ? a < b : a > b) return false;
+      if (op === 'gte' ? a < b : op === 'lte' ? a > b : a >= b) return false;
     } else if (op === 'array_contains') {
       // Module 11: a JSON list holds every value asked for (`meta.videoIds`).
       if (!Array.isArray(actual)) return false;
@@ -391,7 +392,16 @@ export function fakeClipDb(tables: FakeTables) {
     clipJob: {
       ...table(() => tables.jobs as unknown as Row[]),
       create: jest.fn(async ({ data }: { data: Partial<ClipJob> }) => {
-        const row = { ...data, createdAt: now(), updatedAt: now() } as ClipJob;
+        // The columns Postgres fills in (Module 15's scheduler reads `startedAt` and `priority`).
+        const row = {
+          progress: 0,
+          priority: 'normal',
+          startedAt: null,
+          finishedAt: null,
+          ...data,
+          createdAt: now(),
+          updatedAt: now(),
+        } as ClipJob;
         tables.jobs.push(row);
         return row;
       }),
@@ -547,4 +557,33 @@ export function assetRow(overrides: Partial<ClipAsset> = {}): ClipAsset {
     createdAt: EPOCH,
     ...overrides,
   };
+}
+
+/** A fake ledger's entry, as the Clips specs keep them (a reversal keeps its original's `refId`). */
+export interface FakeLedgerEntry {
+  units: number;
+  refId: string | null;
+  organizationId?: string;
+  meter?: string;
+}
+
+/**
+ * Lets `liveChargeFor` (`clips-ai-charges.ts`) read a spec's own ledger
+ * through the fake database: Module 15's scheduler starts a paid AI job only
+ * while its charge stands. An entry without a workspace or meter matches any.
+ */
+export function readsLedger(db: FakeClipDb, entries: readonly FakeLedgerEntry[]): void {
+  type Where = { organizationId?: string; refId?: string; meter?: string };
+  Object.assign(db, {
+    usageEntry: {
+      findMany: jest.fn(async ({ where }: { where: Where }) =>
+        entries.filter(
+          (entry) =>
+            entry.refId === where.refId &&
+            (entry.organizationId === undefined || entry.organizationId === where.organizationId) &&
+            (entry.meter === undefined || entry.meter === where.meter),
+        ),
+      ),
+    },
+  });
 }

@@ -10,7 +10,7 @@ from postgear_media.activities.base import answer, checkpoint, logged, parse_inp
 from postgear_media.contract.generated import MediaPyTranscribeInput
 from postgear_media.core.settings import get_settings
 from postgear_media.core.storage import create_private_storage
-from postgear_media.providers.factory import get_transcriber
+from postgear_media.providers.factory import get_hosted_lane, get_transcriber
 from postgear_media.services.transcribe import TranscribeDeps, transcribe
 
 NAME = "mediaPyTranscribe"
@@ -29,6 +29,7 @@ def media_py_transcribe(payload: dict[str, Any]) -> dict[str, Any]:
             scratch_root=settings.scratch_root,
             checkpoint=checkpoint,
             simulated=settings.simulation,
+            hosted=get_hosted_lane(settings),
         )
         return answer(transcribe(parsed, deps))
 
