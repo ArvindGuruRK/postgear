@@ -5,7 +5,9 @@
  * list. No new structure in the document. Pure.
  *
  * Module 09 adds Bleep Bad Words (`bleeps.ts`, lists in `word-lists/`).
+ * Module 17 adds Remove Bad Takes (`bad-takes.ts`).
  */
+export * from './bad-takes';
 export * from './bleeps';
 export * from './cut-range';
 export * from './fillers';

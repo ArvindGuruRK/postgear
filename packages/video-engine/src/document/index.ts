@@ -76,6 +76,7 @@ export {
   safeParseClipDocument,
   upgrade,
 } from './upgrade';
+export * from './blur';
 export * from './sound';
 export * from './sticker';
 export * from './text';

@@ -50,6 +50,8 @@
  */
 import {
   type AreaState,
+  type BlurRect,
+  blurInto,
   type FrameState,
   lookSvgValues,
   vignetteCss,
@@ -115,6 +117,52 @@ function drawCrop(
   }
   context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
   return true;
+}
+
+/**
+ * Module 17 item 18: each blurred box that falls inside `crop`, drawn again
+ * over the area through a CSS blur, clipped to the box. The source is read a
+ * little wider than the box so its edge does not fade to clear. The radius
+ * is a sixth of the box's short side, as the export's `boxblur`.
+ */
+function drawBlurs(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  crop: { x: number; y: number; w: number; h: number },
+  blurs: readonly BlurRect[],
+  width: number,
+  height: number,
+): void {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  for (const blur of blurs) {
+    const into = blurInto(blur, crop);
+    if (!into) continue;
+    const dx = into.x * width;
+    const dy = into.y * height;
+    const dw = into.w * width;
+    const dh = into.h * height;
+    const radius = Math.max(1, Math.min(dw, dh) / 6);
+    const scaleX = (crop.w * vw) / width;
+    const scaleY = (crop.h * vh) / height;
+    context.save();
+    context.beginPath();
+    context.rect(dx, dy, dw, dh);
+    context.clip();
+    context.filter = `blur(${radius.toFixed(1)}px)`;
+    context.drawImage(
+      video,
+      (crop.x + into.x * crop.w) * vw - radius * scaleX,
+      (crop.y + into.y * crop.h) * vh - radius * scaleY,
+      into.w * crop.w * vw + 2 * radius * scaleX,
+      into.h * crop.h * vh + 2 * radius * scaleY,
+      dx - radius,
+      dy - radius,
+      dw + 2 * radius,
+      dh + 2 * radius,
+    );
+    context.restore();
+  }
 }
 
 /** Draws a fraction of the video into the rectangle `into` (a fraction of the canvas) of a canvas. */
@@ -333,6 +381,16 @@ export class PreviewStage {
             entry.canvas.width,
             entry.canvas.height,
           ) || drew;
+        if (state.blurs.length > 0) {
+          drawBlurs(
+            entry.context,
+            video,
+            area.visibleCrop,
+            state.blurs,
+            entry.canvas.width,
+            entry.canvas.height,
+          );
+        }
       }
     }
     if (state.background.kind === 'blurred') {

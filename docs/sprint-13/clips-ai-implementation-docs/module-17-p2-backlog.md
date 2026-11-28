@@ -1,6 +1,6 @@
 # Module 17: P2 Backlog (Only When You Decide)
 
-> **Sprint 13, Clips AI** | Status: In progress (items 3, 9, 10, 18, 25, 26 picked 2026-11-28) | Size: as picked
+> **Sprint 13, Clips AI** | Status: Six items done 2026-11-28 (3, 9, 10, 18, 25, 26); the rest parked | Size: as picked
 > **Depends on**: [Module 16](module-16-hardening-e2e-closeout.md)
 > **Stories**: none yet (each picked item brings its own)
 > **Rule**: nothing here starts without Arvind's word.
@@ -19,13 +19,13 @@ Where research 01 judged a reference product's feature to be a product of its ow
 |---|---|---|---|
 | 1 | **A Speaker Model** | Choosing who is talking with a model made for it, in place of Module 08's heuristic | The heuristic is isolated in `reframe/speaker.ts`. Research 06 names two candidates whose code is permissive but whose trained files have unclear terms; settle that first |
 | 2 | **Who Said What** | Names on speakers in the transcript ("Host", "Guest") and captions coloured per speaker | Needs voice grouping, which pulls in the heavy library research 04 advised against. Revisit when a light option exists |
-| 3 | **Remove Bad Takes** | Find repeated starts of the same sentence and keep the last | A transcript pass (repeated word runs) plus Module 04's cuts; show them first, as silences are shown |
+| 3 | **Remove Bad Takes** | Find repeated starts of the same sentence and keep the last | **Done 2026-11-28** (Decision Log, 17 (item 3)). A transcript pass (repeated word runs) plus Module 04's cuts; show them first, as silences are shown |
 | 4 | **Keyword Highlighter** | AI picks the two or three words in each caption page to colour | A small model call per clip; a `highlight` flag in the captions track's `edits`. Highlight whole words only for Tamil and Hindi (research 09) |
 | 5 | **AI Emoji** | An emoji beside a caption page where it fits | Stickers through `addItem`, placed from a model's picks; colour emoji are sticker overlays, never text (libass draws emoji in one colour); must be easy to switch off |
 | 6 | **Auto Zoom** | Gentle zooms on emphasis, placed by AI | Zooms from Sprint 12 Module 13, placed from loudness and sentence starts; one undo step |
 | 7 | **Auto Sound Effects And Transitions** | A whoosh on a cut, a pop on a sticker | Sound items from the catalogue; depends on Sprint 12 Module 21's transitions for the picture side |
 | 8 | **Enhance Sound** | Cleaner voice: less noise and room echo | A separate sound model on the Python side; a new AUDIO asset the clip can switch to |
-| 9 | **Lower Music Under Speech** | Music drops when someone talks | The `speech` track drives a volume curve on the sound item |
+| 9 | **Lower Music Under Speech** | Music drops when someone talks | **Done 2026-11-28** (Decision Log, 17 (item 9)). The `speech` track drives a volume curve on the sound item |
 | 10 | **Export The Transcript** | Download the text or an SRT of a clip or a video | **Done 2026-11-28** (Decision Log, 17 (item 10)). A route that writes from the transcript through the time map |
 | 11 | **Templates For Titles And Captions** | Saved post titles and captions with a colour label, as StreamLadder's publisher has | PostGear's Signatures are the nearest thing today; this would extend them. Composer work, not Clips |
 | 12 | **Best Times From Analytics** | Suggest posting times from when past posts did well | Needs enough analytics history per channel; feeds Module 13's posting slots |
@@ -34,7 +34,7 @@ Where research 01 judged a reference product's feature to be a product of its ow
 | 15 | **Share Recipes Between Workspaces** | An agency copies a recipe from one client to another | Export and import of the validated settings |
 | 16 | **A Rented Graphics Card Lane** | Listening and face finding on a card rented by the second | Module 15 documents it; this builds the provider and its switch |
 | 17 | **Voice Dubbing** | The clip's speech in another language with a made-up voice | Translation exists (Module 03); this adds a voice per sentence fitted to the timing. Needs the text-to-speech decision of Module 09 and the AI label always on |
-| 18 | **Blur A Face Or A Region** | Hide a bystander or a screen area for the whole clip | Face boxes from Module 07, or a hand-placed box, drawn by the render plan as a blurred region (the cheap downscaled blur path of Sprint 12 Module 10) |
+| 18 | **Blur A Face Or A Region** | Hide a bystander or a screen area for the whole clip | **Done 2026-11-28** (Decision Log, 17 (item 18)). Face boxes from Module 07, or a hand-placed box, drawn by the render plan as a blurred region (the cheap downscaled blur path of Sprint 12 Module 10) |
 | 19 | **Editors Can Schedule, With Approval** | A workspace switch that lets Editors schedule, or a **Request Approval** state on drafts that an admin approves before anything is queued | Module 14 settled that Editors cannot schedule in v1 (D13-15). This adds either an entitlement-style boolean per workspace set by the admin, or a draft state plus an approval inbox. Needs `assertEditorMayWrite` to learn the new state and the route matrix to list it |
 | 20 | **Editor Activity And Per-Editor Caps** | A Team page tab showing who changed what, and a monthly AI Minutes cap per Editor | An `AuditEntry` table beyond Module 14's four security log events; the usage ledger already carries `meta.by` |
 | 21 | **Model-Based Background Removal For Emotes** | Remove a busy background from an emote without a green screen | A person-segmentation model on the Python side over about 60 frames; the licence of the model weights must be read first, as for every asset. Module 14 ships the colour key only |

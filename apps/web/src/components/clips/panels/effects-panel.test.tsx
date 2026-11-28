@@ -65,6 +65,12 @@ function Harness({ selection, spy }: { selection: EditorSelection; spy: Spy }) {
         selection={selection}
         fps={30}
         playback={playback}
+        onBlur={(make) =>
+          setDoc((current) => {
+            const result = make(current);
+            return result.ok ? result.doc : current;
+          })
+        }
         filmstrip={null}
         onAddZoom={() => {
           spy.added += 1;
@@ -122,12 +128,13 @@ function setup(selection: EditorSelection = null) {
 }
 
 describe('EffectsPanel cards', () => {
-  it('shows three closed cards, each with its name and line', () => {
+  it('shows the closed cards, each with its name and line', () => {
     const { card } = setup();
     for (const [name, line] of [
       ['Zoom', 'Zoom in on a moment'],
       ['Speed Control', 'Slow down or speed up a part'],
       ['Looks', 'Give the whole clip a look'],
+      ['Blur A Region', 'Hide a face or a screen'],
     ]) {
       const trigger = card(name as string);
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -157,6 +164,20 @@ describe('EffectsPanel cards', () => {
     );
     expect(card('Speed Control')).toHaveAttribute('aria-expanded', 'true');
     expect(card('Zoom')).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('the Blur A Region card (Module 17 item 18)', () => {
+  it('adds a box in the middle, and removes it', () => {
+    const { card, doc } = setup();
+    fireEvent.click(card('Blur A Region'));
+    fireEvent.click(screen.getByTestId('clip-blur-add'));
+    expect(doc().blurs).toEqual([
+      expect.objectContaining({ source: doc().sources[0]?.id, x: 0.4, y: 0.4, w: 0.2, h: 0.2 }),
+    ]);
+    expect(screen.getAllByTestId('clip-blur-box')).toHaveLength(1);
+    fireEvent.click(screen.getByTestId('clip-blur-remove'));
+    expect(doc().blurs).toBeUndefined();
   });
 });
 

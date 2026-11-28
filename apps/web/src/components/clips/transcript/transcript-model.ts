@@ -232,12 +232,28 @@ export function loudPausesLine(count: number): string {
     : `${count} pauses have sound under them (music or a game), so they stay.`;
 }
 
+export const NO_TAKES_LINE = 'No bad takes found.';
+/** Said above the list, so nobody fears losing the good try. */
+export const TAKES_KEEP_NOTE =
+  'Each one is an earlier try of a line said again. The last try stays.';
+
+/** "2 takes, 3.1 seconds". */
+export function takesLine(count: number, savedMs: number): string {
+  return `${count} ${count === 1 ? 'take' : 'takes'}, ${spokenLength(savedMs)}`;
+}
+
 /** The toast after a cleanup: what went, and how much shorter the clip is. */
-export function cleanupToast(kind: 'pauses' | 'fillers', count: number, savedMs: number): string {
+export function cleanupToast(
+  kind: 'pauses' | 'fillers' | 'takes',
+  count: number,
+  savedMs: number,
+): string {
   const what =
     kind === 'pauses'
       ? `${count} ${count === 1 ? 'pause' : 'pauses'}`
-      : `${count} filler ${count === 1 ? 'word' : 'words'}`;
+      : kind === 'takes'
+        ? `${count} bad ${count === 1 ? 'take' : 'takes'}`
+        : `${count} filler ${count === 1 ? 'word' : 'words'}`;
   return `Removed ${what}. The clip is ${spokenLength(savedMs)} shorter.`;
 }
 

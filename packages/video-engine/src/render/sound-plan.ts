@@ -13,6 +13,8 @@
  */
 import { soundItems, soundLoops, soundRefKey } from '../document/sound';
 import type { ClipDocument } from '../document/schema';
+import type { MsRange } from '../transcript/types';
+import { duckSpansFor } from './duck';
 import { RenderCompileError } from './errors';
 
 /** Whether the clip has any sound at all: a sound item, or a part with sound that is not muted. */
@@ -65,6 +67,12 @@ export interface PlanSound {
    * AAC file and broke `atrim`'s length.
    */
   wraps: boolean;
+  /**
+   * Module 17 item 9: music with `duck` on, the speech stretches that touch
+   * it on its own clock (0 at its start, ramps outside them); empty for
+   * anything that is not lowered.
+   */
+  duck: MsRange[];
 }
 
 /**
@@ -77,6 +85,7 @@ export function planSounds(
   assets: Readonly<Record<string, RenderSoundAsset>>,
   durationMs: number,
   firstInput: number,
+  speech: readonly MsRange[] = [],
 ): PlanSound[] {
   const sounds: PlanSound[] = [];
   for (const item of soundItems(doc)) {
@@ -124,6 +133,7 @@ export function planSounds(
       itemMs,
       fileMs: asset.durationMs,
       wraps: loop && offsetMs + plays > asset.durationMs,
+      duck: item.type === 'music' && item.duck ? duckSpansFor(speech, startMs, plays) : [],
     });
   }
   return sounds;

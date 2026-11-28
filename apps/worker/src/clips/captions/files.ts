@@ -23,14 +23,17 @@ import { gunzip } from 'node:zlib';
 import type { PrivateStorage } from '@postgear/storage';
 import {
   applyFixes,
-  captionsTracksOf,
   type ClipDocument,
   type CustomCaptionStyle,
+  captionsTracksOf,
   decodeTranscript,
   isBuiltInCaptionStyle,
-  readTranscriptAssetMeta,
+  type MsRange,
   type RenderCaptionsAsset,
+  readTranscriptAssetMeta,
   resolveStyle,
+  soundItems,
+  speechSpans,
   TranscriptFileError,
 } from '@postgear/video-engine';
 import { ClipStepError } from '../failures';
@@ -136,6 +139,48 @@ export async function fetchCaptionsTracks(
   }
   const captions = byTrack[first.id] as RenderCaptionsAsset;
   return tracks.length > 1 ? { captions, captionsByTrack: byTrack } : { captions };
+}
+
+/**
+ * Module 17 item 9: when someone talks in the clip, for music with Lower
+ * Under Speech on. Read from the video's own listened transcript (never a
+ * translation, never a file supplied for one clip), looked up inside the
+ * workspace like the captions'. Null when no music asks for it, and for a
+ * montage (one video's words cannot say when the others talk); an empty list
+ * when nothing was listened to or the file cannot be read, so the export
+ * goes on with the music at its own level, as the editor plays it.
+ */
+export async function fetchSpeech(
+  deps: CaptionFetchDeps,
+  organizationId: string,
+  videoId: string,
+  document: ClipDocument,
+  dir: string,
+  signal?: AbortSignal,
+): Promise<MsRange[] | null> {
+  if (!soundItems(document).some((item) => item.type === 'music' && item.duck)) return null;
+  if (document.sources.length > 1) return null;
+  const assets = await deps.rows.videoAssets(organizationId, videoId);
+  const own = assets.find((row) => {
+    if (row.kind !== 'TRANSCRIPT' || row.clipId !== null) return false;
+    const meta = readTranscriptAssetMeta(row.meta);
+    return meta !== null && meta.source === 'listened';
+  });
+  if (!own) return [];
+  try {
+    const read = await readTranscript(
+      deps,
+      organizationId,
+      videoId,
+      own.id,
+      path.join(dir, 'speech-transcript.json.gz'),
+      signal,
+    );
+    return speechSpans(document, read.transcript, { sourceId: document.sources[0]?.id });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return [];
+  }
 }
 
 /** One transcript asset of one video of the workspace, with the video's word fixes applied. */

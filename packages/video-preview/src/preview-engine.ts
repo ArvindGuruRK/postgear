@@ -64,14 +64,15 @@
  * No render library: two `<video>` elements and `<canvas>` only.
  */
 import {
+  bleepRanges,
   type ClipDocument,
   type FrameState,
-  type Segment,
-  bleepRanges,
   frameState,
   frameToMs,
+  type MsRange,
   msToFrame,
   outputDuration,
+  type Segment,
   type SourcePicture,
 } from '@postgear/video-engine';
 import { type BleepRange, bleepGateAt } from './bleep-schedule';
@@ -200,6 +201,8 @@ function defaultFrames(): FrameScheduler {
 
 export class PreviewEngine {
   private doc: ClipDocument | null = null;
+  /** Module 17 item 9: when someone talks, on the clip's clock (`setSpeech`). */
+  private speech: readonly MsRange[] | null = null;
   private parts: PreviewPart[] = [];
   private durationMs = 0;
   /** The clip's bleeps in output ms. */
@@ -513,6 +516,16 @@ export class PreviewEngine {
    * the elements on a source whose address changed are loaded again (the
    * same address after a failure is a retry), at the current moment.
    */
+  /**
+   * Module 17 item 9: when someone talks in the clip (`speechSpans`), so
+   * music with Lower Under Speech on dips as it will in the export. Null:
+   * nothing is lowered. Read by the next frame.
+   */
+  setSpeech(spans: readonly MsRange[] | null): void {
+    if (this.destroyed) return;
+    this.speech = spans;
+  }
+
   setExtraSources(sources: Readonly<Record<string, PreviewSource | null>> | null): void {
     if (this.destroyed) return;
     const previous = this.extras;
@@ -1198,7 +1211,10 @@ export class PreviewEngine {
     const primarySlot = mix && mixPrimary ? mix.slot : frontSlot;
     let state: FrameState;
     try {
-      state = frameState(this.doc, at, { sources: this.sourcePictures(primarySlot) });
+      state = frameState(this.doc, at, {
+        sources: this.sourcePictures(primarySlot),
+        ...(this.speech ? { speech: this.speech } : {}),
+      });
     } catch {
       this.setError(previewError('draw'));
       return false;

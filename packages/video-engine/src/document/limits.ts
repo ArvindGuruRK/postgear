@@ -104,6 +104,10 @@ export const CAPTION_WORD_MAX = 80;
 export const MAX_CAPTION_EDITS = 2_000;
 /** The most bleeps and mutes one clip keeps. */
 export const MAX_BLEEPS = 300;
+/** Module 17 item 18: blurred boxes on a clip's video. */
+export const MAX_BLURS = 6;
+/** The smallest blur box, a share of the video's width or height. */
+export const BLUR_MIN_SIZE = 0.02;
 /** The most stretches of a followed clip a person may fix by hand. */
 export const MAX_FOLLOW_OVERRIDES = 100;
 

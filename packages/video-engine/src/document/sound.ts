@@ -45,7 +45,10 @@ export function soundFilesNeeded(doc: Pick<ClipDocument, 'tracks'>): SoundFileRe
     for (const item of track.items) {
       const key = soundRefKey(item.ref);
       if (seen.has(key)) continue;
-      seen.set(key, 'library' in item.ref ? { key, library: item.ref.id } : { key, asset: item.ref.asset });
+      seen.set(
+        key,
+        'library' in item.ref ? { key, library: item.ref.id } : { key, asset: item.ref.asset },
+      );
     }
   }
   return [...seen.values()];
@@ -141,7 +144,11 @@ export function defaultSoundItem(
 ): AudioItem {
   const total = outputDuration(doc);
   const fileMs = Math.max(ITEM_MIN_MS, Math.round(file.durationMs));
-  const at = clamp(Math.round(Number.isFinite(atMs) ? atMs : 0), 0, Math.max(0, total - ITEM_MIN_MS));
+  const at = clamp(
+    Math.round(Number.isFinite(atMs) ? atMs : 0),
+    0,
+    Math.max(0, total - ITEM_MIN_MS),
+  );
   const music = type === 'music';
   const wanted = music ? total - at : fileMs;
   const duration = clamp(wanted, Math.min(ITEM_MIN_MS, total), Math.max(0, total - at));
@@ -173,8 +180,10 @@ export function addSound(
   return addItem(doc, defaultSoundItem(doc, atMs, ref, type, file));
 }
 
-/** What the Audio panel changes on a sound. */
-export type SoundPatch = Partial<Pick<AudioItem, 'volume' | 'fadeInMs' | 'fadeOutMs' | 'offsetMs'>>;
+/** What the Audio panel changes on a sound (`duck`, Module 17 item 9: music only). */
+export type SoundPatch = Partial<
+  Pick<AudioItem, 'volume' | 'fadeInMs' | 'fadeOutMs' | 'offsetMs' | 'duck'>
+>;
 
 function roundVolume(value: number): number {
   return Math.round(clamp(value, 0, VOLUME_MAX) * 100) / 100;
@@ -196,18 +205,24 @@ export function updateSound(doc: ClipDocument, itemId: string, patch: SoundPatch
       ...item,
       volume: patch.volume === undefined ? item.volume : roundVolume(patch.volume),
       fadeInMs:
-        patch.fadeInMs === undefined ? item.fadeInMs : Math.round(clamp(patch.fadeInMs, 0, fadeCap)),
+        patch.fadeInMs === undefined
+          ? item.fadeInMs
+          : Math.round(clamp(patch.fadeInMs, 0, fadeCap)),
       fadeOutMs:
         patch.fadeOutMs === undefined
           ? item.fadeOutMs
           : Math.round(clamp(patch.fadeOutMs, 0, fadeCap)),
-      offsetMs: patch.offsetMs === undefined ? item.offsetMs : Math.max(0, Math.round(patch.offsetMs)),
+      offsetMs:
+        patch.offsetMs === undefined ? item.offsetMs : Math.max(0, Math.round(patch.offsetMs)),
+      // Only music is lowered under speech; an effect keeps `duck` off.
+      duck: patch.duck === undefined || item.type !== 'music' ? item.duck : patch.duck,
     };
     const same =
       next.volume === item.volume &&
       next.fadeInMs === item.fadeInMs &&
       next.fadeOutMs === item.fadeOutMs &&
-      next.offsetMs === item.offsetMs;
+      next.offsetMs === item.offsetMs &&
+      next.duck === item.duck;
     return same ? item : next;
   });
 }
@@ -222,7 +237,11 @@ export function removeSound(doc: ClipDocument, itemId: string): SoundEditResult 
 }
 
 /** One part's own sound: 0 (muted) to 2 (twice as loud), to the hundredth. */
-export function setSegmentVolume(doc: ClipDocument, segmentId: string, volume: number): ClipDocument {
+export function setSegmentVolume(
+  doc: ClipDocument,
+  segmentId: string,
+  volume: number,
+): ClipDocument {
   if (!Number.isFinite(volume)) return doc;
   const next = roundVolume(volume);
   let changed = false;

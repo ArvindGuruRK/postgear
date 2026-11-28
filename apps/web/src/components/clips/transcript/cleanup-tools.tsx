@@ -12,9 +12,14 @@
  * Module 10: the same step records the cleanup on the clip (`meta.cleanup`:
  * the slider's shortest pause, or that fillers went), so Save As Recipe
  * reads it back.
+ *
+ * Module 17 item 3: Remove Bad Takes lists each line said again with the
+ * words of the earlier try, a tick each, and keeps the last try. It is not
+ * recorded for recipes: a take is a judgement on this clip's own words.
  */
 import { AudioLinesIcon } from '@animateicons/react/lucide/audio-lines-icon';
 import { EraserIcon } from '@animateicons/react/lucide/eraser-icon';
+import { RepeatIcon } from '@animateicons/react/lucide/repeat-icon';
 import {
   Button,
   Checkbox,
@@ -25,9 +30,11 @@ import {
   Slider,
 } from '@postgear/ui';
 import {
+  type BadTake,
   type ClipDocument,
   type CutResult,
   clipSourceRanges,
+  findBadTakes,
   findFillers,
   findSilences,
   loudFromPeaks,
@@ -45,9 +52,12 @@ import {
   cutRefusalSentence,
   loudPausesLine,
   NO_FILLERS_LINE,
+  NO_TAKES_LINE,
   noPausesLine,
   pausesLine,
   spokenLength,
+  TAKES_KEEP_NOTE,
+  takesLine,
   withCleanupNote,
 } from './transcript-model';
 
@@ -84,6 +94,7 @@ export function CleanupTools(props: CleanupToolsProps) {
     <div className="flex flex-wrap gap-2" data-testid="clip-transcript-cleanup">
       <RemoveSilences {...props} />
       <RemoveFillers {...props} />
+      <RemoveTakes {...props} />
     </div>
   );
 }
@@ -324,6 +335,131 @@ function FillerRow({
         {`"${name}"`}
       </label>
       <span className="font-sans text-xs tabular-nums text-ink type-muted">{`${count}x`}</span>
+    </li>
+  );
+}
+
+function RemoveTakes({ document, sourceId, words, disabled, onApply }: CleanupToolsProps) {
+  const [open, setOpen] = useState(false);
+  const [unticked, setUnticked] = useState<ReadonlySet<number>>(new Set());
+  const takes = useMemo(
+    () => (open ? findBadTakes({ words: [...words] }, clipSourceRanges(document, sourceId)) : []),
+    [open, words, document, sourceId],
+  );
+  const textOf = useMemo(() => {
+    const byIndex = new Map(words.map((word) => [word.i, word.text]));
+    return (take: BadTake) => take.words.map((i) => byIndex.get(i) ?? '').join(' ');
+  }, [words]);
+  const { cuts, count } = useMemo(() => {
+    const chosen = takes.filter((take) => !unticked.has(take.keptFrom));
+    return { cuts: chosen.map((take) => take.cut), count: chosen.length };
+  }, [takes, unticked]);
+  const tried = useMemo(() => tryCuts(document, sourceId, cuts), [document, sourceId, cuts]);
+
+  const remove = () => {
+    if (cuts.length === 0) return;
+    const applied = onApply(
+      (doc) => removeSourceRanges(doc, sourceId, cuts),
+      (before, after) =>
+        cleanupToast('takes', count, outputDuration(before) - outputDuration(after)),
+    );
+    if (applied) setOpen(false);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setUnticked(new Set());
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button variant="secondary" size="sm" disabled={disabled} data-testid="clip-remove-takes">
+          <MotionIcon icon={RepeatIcon} className="h-4 w-4" />
+          Remove Bad Takes
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="flex w-80 flex-col gap-3"
+        data-testid="clip-takes-popover"
+      >
+        {takes.length === 0 ? (
+          <p className="m-0 font-sans text-sm text-ink" role="status">
+            {NO_TAKES_LINE}
+          </p>
+        ) : (
+          <>
+            <p className={NOTE}>{TAKES_KEEP_NOTE}</p>
+            <ul className="m-0 flex max-h-64 list-none flex-col gap-2 overflow-y-auto p-0">
+              {takes.map((take) => (
+                <TakeRow
+                  key={take.keptFrom}
+                  said={textOf(take)}
+                  ticked={!unticked.has(take.keptFrom)}
+                  onTicked={(ticked) =>
+                    setUnticked((current) => {
+                      const next = new Set(current);
+                      if (ticked) next.delete(take.keptFrom);
+                      else next.add(take.keptFrom);
+                      return next;
+                    })
+                  }
+                />
+              ))}
+            </ul>
+            {count > 0 && tried.refusal === null ? (
+              <p className={NOTE} role="status">
+                {takesLine(count, tried.savedMs)}
+              </p>
+            ) : null}
+            {tried.refusal ? (
+              <p className="m-0 font-sans text-xs text-danger" role="alert">
+                {tried.refusal}
+              </p>
+            ) : null}
+            <Button
+              size="sm"
+              disabled={cuts.length === 0 || tried.refusal !== null}
+              onClick={remove}
+              data-testid="clip-takes-remove"
+            >
+              Remove
+            </Button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** The earlier try's words only: the line under the list says what the clip really loses. */
+function TakeRow({
+  said,
+  ticked,
+  onTicked,
+}: {
+  said: string;
+  ticked: boolean;
+  onTicked: (ticked: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <li className="flex items-start gap-2">
+      <Checkbox
+        id={id}
+        className="mt-0.5"
+        checked={ticked}
+        onCheckedChange={(value) => onTicked(value === true)}
+      />
+      <label
+        htmlFor={id}
+        className="line-clamp-2 flex-1 font-sans text-sm text-ink"
+        data-testid="clip-take-row"
+      >
+        {`"${said}"`}
+      </label>
     </li>
   );
 }

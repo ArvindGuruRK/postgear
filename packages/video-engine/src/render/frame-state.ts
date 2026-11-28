@@ -29,6 +29,8 @@
  * Pure and cheap: numbers in, numbers out, no allocation beyond the answer.
  * The preview calls it on every frame.
  */
+
+import { type BlurRect, blursOf } from '../document/blur';
 import type {
   ClipDocument,
   CropKeyframe,
@@ -41,11 +43,13 @@ import type {
 import { soundGainAt, soundLoops, soundRefKey } from '../document/sound';
 import { FULL_RECT, fitRect, type Point, type Rect, rectAspect } from '../geometry';
 import { layoutBase } from '../layout/base';
-import { type BleepRange, bleepsAt } from './bleep-plan';
-import { textFadeAt } from './text-plan';
 import { type RenderedMoment, renderedMoment } from '../time/cards';
 import { frameToMs, joinAt, outputDuration, segmentAt, toSource } from '../time/time-map';
 import { zoomAt } from '../time/zooms';
+import type { MsRange } from '../transcript/types';
+import { type BleepRange, bleepsAt } from './bleep-plan';
+import { duckGainAt } from './duck';
+import { textFadeAt } from './text-plan';
 
 /** What the caller knows about a source's picture (from the file it plays or renders). */
 export interface SourcePicture {
@@ -63,6 +67,11 @@ export interface FrameStateOptions {
    * shape already (the layout presets make it so).
    */
   sources?: Readonly<Record<string, SourcePicture>>;
+  /**
+   * Module 17 item 9: when someone talks, on the clip's clock (`speechSpans`).
+   * A music item with `duck` on is lowered under them; without them nothing is.
+   */
+  speech?: readonly MsRange[];
 }
 
 /** The part of the video playing, and where in it. */
@@ -164,6 +173,11 @@ export interface FrameState {
   segment: SegmentState;
   background: BackgroundState;
   areas: AreaState[];
+  /**
+   * Module 17 item 18: the blurred boxes of the playing video, each a
+   * fraction of its picture (`blurInto` places one inside an area's crop).
+   */
+  blurs: BlurRect[];
   zoom: ZoomState;
   looks: Looks;
   /** The clip's fade in and out, 0 (black, silent) to 1. */
@@ -431,7 +445,12 @@ export function frameState(
             type: item.type,
             refKey: soundRefKey(item.ref),
             loop: soundLoops(item),
-            gain: soundGainAt(item, localMs) * fadeOpacity,
+            gain:
+              soundGainAt(item, localMs) *
+              fadeOpacity *
+              (item.type === 'music' && item.duck && options.speech
+                ? duckGainAt(options.speech, t)
+                : 1),
             fileMs: item.offsetMs + localMs,
           });
         }
@@ -462,6 +481,7 @@ export function frameState(
     },
     background,
     areas,
+    blurs: blursOf(doc, segment.source).map(({ x, y, w, h }) => ({ x, y, w, h })),
     zoom,
     looks: { ...doc.looks },
     fadeOpacity,

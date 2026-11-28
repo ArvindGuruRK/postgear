@@ -107,6 +107,16 @@ describe('sound items', () => {
     expect(same.ok && same.doc).toBe(result.doc);
   });
 
+  it('turns Lower Under Speech on for music only (Module 17 item 9)', () => {
+    const { doc, item } = added(clip(), 'music', 0, 4_000);
+    const on = updateSound(doc, item.id, { duck: true });
+    const turned = on.ok ? (findItem(on.doc, item.id)?.item as AudioItem | undefined) : undefined;
+    expect(turned?.duck).toBe(true);
+    const effect = added(clip(), 'sfx', 0, 500);
+    const refused = updateSound(effect.doc, effect.item.id, { duck: true });
+    expect(refused.ok && refused.doc).toBe(effect.doc);
+  });
+
   it('removes only sounds', () => {
     const { doc, item } = added(clip(), 'sfx', 0, 500);
     const removed = removeSound(doc, item.id);

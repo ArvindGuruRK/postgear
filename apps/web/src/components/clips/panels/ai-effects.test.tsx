@@ -170,6 +170,7 @@ function Harness({
         selection={null}
         fps={30}
         playback={playback}
+        onBlur={() => undefined}
         filmstrip={null}
         onAddZoom={() => undefined}
         onZoom={() => undefined}

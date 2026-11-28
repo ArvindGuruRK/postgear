@@ -32,6 +32,7 @@ export const EFFECT_CARDS = [
   { value: 'zoom', name: 'Zoom', line: 'Zoom in on a moment' },
   { value: 'speed', name: 'Speed Control', line: 'Slow down or speed up a part' },
   { value: 'looks', name: 'Looks', line: 'Give the whole clip a look' },
+  { value: 'blur', name: 'Blur A Region', line: 'Hide a face or a screen' },
 ] as const;
 export type EffectCard = (typeof EFFECT_CARDS)[number]['value'];
 

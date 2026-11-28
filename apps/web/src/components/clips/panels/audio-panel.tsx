@@ -103,6 +103,10 @@ export interface AudioPanelProps {
   onRemove: () => void;
 }
 
+/** Module 17 item 9: what Lower Under Speech does, and what it needs. */
+export const DUCK_HELP =
+  'The music drops while someone talks. It follows the transcript, so listen to the clip first.';
+
 const AUDIO_TAB_ICONS: Readonly<Record<AudioTab, AnimatedIcon>> = {
   effects: ZapIcon,
   music: MusicIcon,
@@ -439,6 +443,7 @@ function SelectedSound({
 }) {
   const fadeInId = useId();
   const fadeOutId = useId();
+  const duckId = useId();
   const music = item.type === 'music';
   const Icon = music ? Music : AudioLines;
   // An effect plays once: For stops where its file ends.
@@ -491,6 +496,20 @@ function SelectedSound({
             onCheckedChange={(on) => onEdit({ fadeOutMs: on ? SOUND_FADE_MS : 0 })}
           />
         </div>
+        {music ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-3">
+              <GroupLabel id={duckId}>Lower Under Speech</GroupLabel>
+              <Toggle
+                aria-labelledby={duckId}
+                checked={item.duck}
+                onCheckedChange={(on) => onEdit({ duck: on })}
+                data-testid="clip-sound-duck"
+              />
+            </div>
+            <p className="m-0 font-sans text-xs text-ink type-muted">{DUCK_HELP}</p>
+          </div>
+        ) : null}
       </PanelSection>
 
       <WhenItShows

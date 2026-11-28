@@ -22,18 +22,24 @@
  * No file access: the files are named by the caller (`ctx.assets`), relative
  * to the job's scratch folder.
  */
+
+import { type BlurRect, blursOf } from '../document/blur';
 import { type ClipDocument, clipDocumentSchema, type Segment } from '../document/schema';
 import { type ExportQuality, isExportQuality } from '../quality';
 import { cardsMs } from '../time/cards';
 import { outputDuration, placeSegments } from '../time/time-map';
 import { zoomWindows } from '../time/zooms';
+import type { MsRange } from '../transcript/types';
 import { type BleepRange, bleepRanges } from './bleep-plan';
-import { cardsOf, type PlanCards, planCards } from './card-plan';
-import { RenderCompileError } from './errors';
 import { type PlanCaptions, planCaptionsTracks, type RenderCaptionsAsset } from './caption-plan';
+import { cardsOf, type PlanCards, planCards } from './card-plan';
+import { cropSizeIsConstant, type PlanCropPath, planCropPath } from './crop-path';
+import { RenderCompileError } from './errors';
 import { checkFonts, type FontManifest, fontsNeeded } from './fonts';
+import { effectiveFades, frameState, type SourcePicture } from './frame-state';
 import { type PlanLook, planLook } from './looks';
 import { type PlanSound, planSounds, type RenderSoundAsset } from './sound-plan';
+import { type EncodeSpec, encodeSpecFor, evenPosition, evenSize, outputSizeFor } from './specs';
 import { type PlanSticker, planStickers, type RenderStickerAsset } from './sticker-plan';
 import {
   type PlanShape,
@@ -43,9 +49,6 @@ import {
   textFontFiles,
   textFontNames,
 } from './text-plan';
-import { cropSizeIsConstant, type PlanCropPath, planCropPath } from './crop-path';
-import { effectiveFades, frameState, type SourcePicture } from './frame-state';
-import { type EncodeSpec, encodeSpecFor, evenPosition, evenSize, outputSizeFor } from './specs';
 import type { PlanZoom } from './zoom';
 
 /** The file the worker has for one of the document's sources. */
@@ -87,6 +90,12 @@ export interface RenderAssets {
   stickers?: Readonly<Record<string, RenderStickerAsset>> | null;
   /** Sound files (`.m4a`), keyed by `soundRefKey` (`library:<id>`, `asset:<id>`). */
   sounds?: Readonly<Record<string, RenderSoundAsset>> | null;
+  /**
+   * Module 17 item 9: when someone talks, on the clip's clock (`speechSpans`
+   * of the clip's listened words), worked out by the prepare step. Music with
+   * `duck` on is lowered under them; without them nothing is.
+   */
+  speech?: readonly MsRange[] | null;
   /**
    * Sprint 13: the words and the style of the clip's captions, resolved by the
    * prepare step (nothing is fetched during a render). Needed exactly when the
@@ -136,6 +145,8 @@ export interface PlanInput {
   hasAudio: boolean;
   /** How many segments read this input (more than one needs `split`). */
   segmentCount: number;
+  /** Module 17 item 18: boxes of this video blurred before anything crops it. */
+  blurs: BlurRect[];
 }
 
 export type PlanBase =
@@ -490,6 +501,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
         seekMs: seek > 0 ? seek : null,
         hasAudio: asset.hasAudio,
         segmentCount: 0,
+        blurs: blursOf(doc, segment.source).map(({ x, y, w, h }) => ({ x, y, w, h })),
       };
       inputs.push(current);
     }
@@ -618,6 +630,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     ctx.assets.sounds ?? {},
     durationMs,
     inputs.length + stickers.length + (watermark ? 1 : 0),
+    checkedSpeech(ctx.assets.speech ?? []),
   );
 
   // Cards (Module 10): their logos read the inputs after the sounds.
@@ -694,4 +707,24 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     ...(cards ? { cards } : {}),
     ...(moreCaptions.length > 0 ? { moreCaptions } : {}),
   };
+}
+
+/** Speech stretches as the prepare step handed them: whole ms, each ending after it starts, in order. */
+function checkedSpeech(spans: readonly MsRange[]): readonly MsRange[] {
+  let previous = Number.NEGATIVE_INFINITY;
+  for (const span of spans) {
+    const ok =
+      Number.isInteger(span.fromMs) &&
+      Number.isInteger(span.toMs) &&
+      span.fromMs < span.toMs &&
+      span.fromMs >= previous;
+    if (!ok) {
+      throw new RenderCompileError(
+        'invalid_context',
+        'Speech stretches must be whole ms, in order',
+      );
+    }
+    previous = span.toMs;
+  }
+  return spans;
 }

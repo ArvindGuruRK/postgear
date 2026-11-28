@@ -11,6 +11,7 @@ import { IDLE_PREVIEW_SNAPSHOT, type PreviewSnapshot } from '@postgear/video-pre
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import { type PlaybackEngine, PlaybackStore } from '../editor/playback';
+import { NO_TAKES_LINE, TAKES_KEEP_NOTE } from './transcript-model';
 import { TranscriptPane, type TranscriptPaneProps } from './transcript-pane';
 
 jest.mock('@/lib/clips-api', () => ({
@@ -354,6 +355,46 @@ describe('TranscriptPane', () => {
     expect(applied[0]?.sentence).toBe('Removed 1 filler word. The clip is 0.3 seconds shorter.');
     const result = applied[0]?.result;
     expect(result?.ok && result.doc.meta?.cleanup).toEqual({ fillers: true });
+  });
+
+  it('Remove Bad Takes lists the earlier try with a tick, and keeps the last try', async () => {
+    const stumble = words([
+      ['So', 10_200, 10_400],
+      ['today', 10_450, 10_800],
+      ['we', 10_850, 11_000],
+      ['So', 11_600, 11_800],
+      ['today', 11_850, 12_100],
+      ['we', 12_150, 12_300],
+      ['build', 12_350, 12_700],
+      ['it.', 12_750, 13_100],
+    ]);
+    api.getClipWords?.mockResolvedValue(view(stumble));
+    const { applied } = setup();
+    await screen.findByTestId('transcript-text');
+    fireEvent.click(screen.getByTestId('clip-remove-takes'));
+    const popover = await screen.findByTestId('clip-takes-popover');
+    expect(within(popover).getByTestId('clip-take-row')).toHaveTextContent('"So today we"');
+    expect(within(popover).getByText(TAKES_KEEP_NOTE)).toBeInTheDocument();
+    const tick = within(popover).getByRole('checkbox');
+    fireEvent.click(tick);
+    expect(within(popover).getByTestId('clip-takes-remove')).toBeDisabled();
+    fireEvent.click(tick);
+    expect(within(popover).getByRole('status')).toHaveTextContent('1 take,');
+    fireEvent.click(within(popover).getByTestId('clip-takes-remove'));
+    expect(applied[0]?.sentence).toMatch(
+      /^Removed 1 bad take\. The clip is [0-9.]+ seconds? shorter\.$/,
+    );
+    const result = applied[0]?.result;
+    expect(result?.ok).toBe(true);
+    // Not recorded for recipes: a take is a judgement on this clip's own words.
+    expect(result?.ok && result.doc.meta?.cleanup).toBeUndefined();
+  });
+
+  it('says so when no bad take was found', async () => {
+    setup();
+    await screen.findByTestId('transcript-text');
+    fireEvent.click(screen.getByTestId('clip-remove-takes'));
+    expect(await screen.findByText(NO_TAKES_LINE)).toBeInTheDocument();
   });
 
   it('says so when no filler word was found', async () => {

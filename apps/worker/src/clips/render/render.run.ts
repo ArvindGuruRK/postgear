@@ -24,9 +24,9 @@ import {
   copyFontsInto,
   copyWatermarkInto,
   type FontsFolder,
-  type MediaFacts,
   type MeasureFileInput,
   type MeasureLoudnessInput,
+  type MediaFacts,
   mapPercent,
   type PosterResult,
   type RenderClipInput,
@@ -42,7 +42,6 @@ import {
 import {
   buildRenderPlan,
   checkFonts,
-  pickSourceFiles,
   compileFfmpeg,
   compileMeasure,
   decideLoudness,
@@ -53,6 +52,7 @@ import {
   type LoudnessMeasure,
   type LoudnessResult,
   loudnessResult,
+  pickSourceFiles,
   type RenderedFileFacts,
   type RenderInput,
   type RenderPlan,
@@ -60,12 +60,12 @@ import {
   renderOutputSchema,
   verifyOutput,
 } from '@postgear/video-engine';
+import { type CaptionRows, fetchCaptionsTracks, fetchSpeech } from '../captions/files';
 import { ClipStepError } from '../failures';
 import type { ClipInternalClient } from '../internal-client';
 import type { JobProgress } from '../job-progress';
 import { exportMediaKeys } from '../keys';
 import type { AssetRow, ClipRows, JobRow } from '../rows';
-import { type CaptionRows, fetchCaptionsTracks } from '../captions/files';
 import { fetchSoundFiles } from '../sounds/files';
 import type { SoundFileRows } from '../sounds/rows';
 import { fetchStickerFiles } from '../stickers/files';
@@ -294,6 +294,17 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
       )
     : {};
   const captions = fetched.captions;
+  // Module 17 item 9: when someone talks, for music lowered under speech.
+  const speech = run.captionRows
+    ? await fetchSpeech(
+        { rows: run.captionRows, privateStorage: run.privateStorage },
+        org,
+        input.videoId,
+        input.document,
+        dir,
+        signal,
+      )
+    : null;
   run.heartbeat();
 
   // The mark, when the plan asks for it: copied in under its plain name, with its real size.
@@ -316,6 +327,7 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
           : null,
       watermark,
       captions: captions ?? null,
+      ...(speech && speech.length > 0 ? { speech } : {}),
       ...(Object.keys(segmentSources).length > 0 ? { segmentSources } : {}),
       ...(fetched.captionsByTrack ? { captionsByTrack: fetched.captionsByTrack } : {}),
     },

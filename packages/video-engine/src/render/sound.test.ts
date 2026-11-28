@@ -105,6 +105,7 @@ describe('sounds in the plan', () => {
         itemMs: 1_500,
         fileMs: 1_000,
         wraps: false,
+        duck: [],
       },
       {
         id: 'bed',
@@ -120,6 +121,7 @@ describe('sounds in the plan', () => {
         itemMs: 12_000,
         fileMs: 5_000,
         wraps: true,
+        duck: [],
       },
     ]);
     expect(plan.inputs).toHaveLength(2);
@@ -168,6 +170,7 @@ describe('the sound graph', () => {
         itemMs: 1_500,
         fileMs: 1_000,
         wraps: false,
+        duck: [],
       },
       '[as0]',
     );

@@ -60,6 +60,7 @@ import {
   Heading,
   type LucideIcon,
   Palette,
+  ScanFace,
   VolumeX,
   ZoomIn,
 } from 'lucide-react';
@@ -74,14 +75,13 @@ import {
 } from 'react';
 import { GroupLabel, NOTE, PercentSlider, Segmented } from '@/components/studio/panel-ui';
 import type { ClipFilmstrip } from '@/types/clips';
-import { AI_EFFECT_CARDS, type AiEffectCard } from './ai-effects-model';
-import { type AiEffectsInput, DEFAULT_AI_EFFECTS_DEPS, useSpokenWords } from './ai-effects-deps';
-import { BleepRow } from './bleep-row';
-import { HookClipRow, HookTitleRow } from './hook-rows';
-import { VoiceRow } from './voice-row';
 import type { EditorSelection } from '../editor/editor-state';
 import type { PlaybackStore } from '../editor/playback';
 import { forgetSheetWaiter, prepareCanvas, sheetImage } from '../timeline/timeline-media';
+import { type AiEffectsInput, DEFAULT_AI_EFFECTS_DEPS, useSpokenWords } from './ai-effects-deps';
+import { AI_EFFECT_CARDS, type AiEffectCard } from './ai-effects-model';
+import { BleepRow } from './bleep-row';
+import { type BlurChange, BlurControls } from './blur-controls';
 import {
   amountText,
   EASE_OPTIONS,
@@ -103,6 +103,8 @@ import {
   ZOOM_PICK_NOTE,
   zoomTiming,
 } from './effects-model';
+import { HookClipRow, HookTitleRow } from './hook-rows';
+import { VoiceRow } from './voice-row';
 
 export interface EffectsPanelProps {
   document: ClipDocument;
@@ -128,6 +130,8 @@ export interface EffectsPanelProps {
   onSpeed: (segmentId: string, speed: Speed) => void;
   onLooks: (change: Partial<Looks>, coalesceKey?: string) => void;
   onFades: (change: Partial<Fades>) => void;
+  /** Module 17 item 18: a change to the blurred boxes, one undo step. */
+  onBlur: BlurChange;
   /** Sprint 13, Module 09: the AI rows' needs; left out, the rows do not show. */
   ai?: AiEffectsInput | null;
 }
@@ -136,6 +140,7 @@ const CARD_ICONS: Readonly<Record<EffectCard | AiEffectCard, LucideIcon>> = {
   zoom: ZoomIn,
   speed: Gauge,
   looks: Palette,
+  blur: ScanFace,
   bleep: VolumeX,
   'hook-title': Heading,
   'hook-clip': Clapperboard,
@@ -162,6 +167,7 @@ export function EffectsPanel({
   onSpeed,
   onLooks,
   onFades,
+  onBlur,
   ai = null,
 }: EffectsPanelProps) {
   const [open, setOpen] = useState<string[]>(() => {
@@ -212,6 +218,7 @@ export function EffectsPanel({
       />
     ),
     speed: <SpeedControls segment={segment} onSpeed={onSpeed} />,
+    blur: <BlurControls document={document} onBlur={onBlur} />,
     looks: (
       <LookControls
         document={document}

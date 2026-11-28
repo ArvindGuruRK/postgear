@@ -85,8 +85,14 @@ import {
   type AudioItem,
   addItem,
   addZoom,
+  aiMinutesCost,
   type BadgePlatform,
+  type BlurEditResult,
+  type CaptionsTrack,
   type ClipDocument,
+  captionLayout,
+  captionsTrackOf,
+  captionsTracksOf,
   countSounds,
   defaultBadgeItem,
   defaultSoundItem,
@@ -112,6 +118,7 @@ import {
   type Speed,
   type StickerItem,
   type StickerUploadView,
+  safeAreaGuide,
   setItemAnchor,
   setItemTiming,
   setSegmentVolume,
@@ -123,6 +130,7 @@ import {
   type TextItem,
   type TextStyleId,
   type TimedItem,
+  updateCaptionsTrack,
   updateItem,
   updateSound,
   updateZoom,
@@ -130,25 +138,12 @@ import {
   WATERMARK_MARGIN_FRACTION,
   WATERMARK_OPACITY,
   WATERMARK_WIDTH_FRACTION,
-  type Zoom,
-  aiMinutesCost,
-  type CaptionsTrack,
-  captionLayout,
-  captionsTrackOf,
-  captionsTracksOf,
-  safeAreaGuide,
-  updateCaptionsTrack,
   withCaptionsTrack,
   withoutCaptions,
+  type Zoom,
 } from '@postgear/video-engine';
 import { DomOverlayLayer, usePreviewEngine, WebAudioLayer } from '@postgear/video-preview';
 import { TriangleAlert } from 'lucide-react';
-import { captionBars, lookOf } from '../panels/captions-model';
-import { CaptionsPanel } from '../panels/captions-panel';
-import { useCaptions } from '../panels/use-captions';
-import type { ApplyCut } from '../transcript/cleanup-tools';
-import { TranscriptPane } from '../transcript/transcript-pane';
-import { cutRefusalSentence } from '../transcript/transcript-model';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -177,10 +172,12 @@ import { registerLeaveGuard } from '@/lib/leave-guard';
 import type { ClipDetail } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
 import { CropStage } from '../layouts/crop-stage';
-import { useFollowSpeaker } from '../layouts/use-follow-speaker';
-import { LAST_CROP_SENTENCE } from '../layouts/layouts-model';
 import { cameraAreaOf } from '../layouts/detect-camera-model';
+import { LAST_CROP_SENTENCE } from '../layouts/layouts-model';
 import { type LayoutEdit, LayoutsPanel } from '../layouts/layouts-panel';
+import { useFollowSpeaker } from '../layouts/use-follow-speaker';
+import type { AiEffectsInput } from '../panels/ai-effects-deps';
+import { HOOK_REMOVED } from '../panels/ai-effects-model';
 import {
   layerFiles,
   rowSoundInfo,
@@ -192,14 +189,14 @@ import {
   unknownSoundFiles,
 } from '../panels/audio-model';
 import { AudioPanel } from '../panels/audio-panel';
+import { captionBars, lookOf } from '../panels/captions-model';
+import { CaptionsPanel } from '../panels/captions-panel';
 import {
   addZoomSentence,
   playheadAfterSpeed,
   speedSentence,
   ZOOM_ROOM_SENTENCE,
 } from '../panels/effects-model';
-import { HOOK_REMOVED } from '../panels/ai-effects-model';
-import type { AiEffectsInput } from '../panels/ai-effects-deps';
 import { EffectsPanel } from '../panels/effects-panel';
 import {
   fileInfoOf,
@@ -212,6 +209,7 @@ import {
 } from '../panels/elements-model';
 import { ElementsPanel, type StickerEdit } from '../panels/elements-panel';
 import { type TextEdit, TextPanel } from '../panels/text-panel';
+import { useCaptions } from '../panels/use-captions';
 import { MoreVideoRequester } from '../timeline/more-video';
 import {
   addRefusalSentence,
@@ -223,6 +221,9 @@ import {
   splitAtPlayhead,
   tabForSelection,
 } from '../timeline/timeline-model';
+import type { ApplyCut } from '../transcript/cleanup-tools';
+import { cutRefusalSentence } from '../transcript/transcript-model';
+import { TranscriptPane } from '../transcript/transcript-pane';
 import {
   backHref as backHrefOf,
   CONFLICT_SENTENCE,
@@ -254,7 +255,6 @@ import {
   needsShape,
 } from './editor-state';
 import { EditorTopBar } from './editor-top-bar';
-import { usePreviewSources } from './extra-sources';
 import {
   changedSince,
   EXPORT_DONE_SENTENCE,
@@ -264,21 +264,7 @@ import {
   leaveOutSentence,
 } from './export-model';
 import { ExportPanel, useClipExport } from './export-panel';
-import { usePlaybackStore } from './playback';
-import { SendClipDialog, type SendExportRun } from './send-dialog';
-import { composerHref } from './send-model';
-import { recipeSavedSentence } from './recipe-model';
-import { ApplyRecipeDialog, SaveRecipeDialog } from './recipe-dialogs';
-import { ShapeDialog } from './shape-dialog';
-import { Stage } from './stage';
-import { TabRail } from './tab-rail';
-import { TimelineDock } from './timeline-dock';
-import { MeasuredHeights, TransformLayer } from './transform-layer';
-import { centreToTransform, itemFrame, nudgeFrame, type StageItem } from './transform-model';
-import { type DockControls, TransportBar } from './transport-bar';
-import { useCameraOnOpen } from './use-camera-on-open';
-import { useClipAutosave } from './use-clip-autosave';
-import { useEditorRecipes } from './use-editor-recipes';
+import { usePreviewSources } from './extra-sources';
 import { montageCaptionLayouts, useMontageTranscripts } from './montage-captions';
 import {
   applyToPart,
@@ -288,6 +274,22 @@ import {
   partClipTitle,
   partView,
 } from './montage-layout';
+import { usePlaybackStore } from './playback';
+import { ApplyRecipeDialog, SaveRecipeDialog } from './recipe-dialogs';
+import { recipeSavedSentence } from './recipe-model';
+import { SendClipDialog, type SendExportRun } from './send-dialog';
+import { composerHref } from './send-model';
+import { ShapeDialog } from './shape-dialog';
+import { Stage } from './stage';
+import { TabRail } from './tab-rail';
+import { TimelineDock } from './timeline-dock';
+import { MeasuredHeights, TransformLayer } from './transform-layer';
+import { centreToTransform, itemFrame, nudgeFrame, type StageItem } from './transform-model';
+import { type DockControls, TransportBar } from './transport-bar';
+import { useCameraOnOpen } from './use-camera-on-open';
+import { useClipAutosave } from './use-clip-autosave';
+import { useClipSpeech } from './use-clip-speech';
+import { useEditorRecipes } from './use-editor-recipes';
 
 const subscribeNever = () => () => undefined;
 
@@ -391,6 +393,11 @@ export function ClipEditor({
     crossOrigin: 'anonymous',
   });
   const playback = usePlaybackStore(engine);
+  // Module 17 item 9: music lowered under speech dips in the preview as in the export.
+  const speech = useClipSpeech(clipId, shownDocument);
+  useEffect(() => {
+    engine?.setSpeech(speech);
+  }, [engine, speech]);
   const dock = useRef<DockControls | null>(null);
 
   // ---- Sticker files (Module 12) -----------------------------------------------------
@@ -1438,6 +1445,17 @@ export function ClipEditor({
     [commit],
   );
 
+  /** Module 17 item 18: a blurred box added, moved or removed, one undo step (drags coalesce). */
+  const editBlur = useCallback(
+    (make: (doc: ClipDocument) => BlurEditResult, coalesceKey?: string) => {
+      const doc = latest.current.document;
+      const result = make(doc);
+      if (!result.ok || result.doc === doc) return;
+      commit(doc, result.doc, { coalesceKey });
+    },
+    [commit],
+  );
+
   // ---- AI effects (Sprint 13, Module 09) ---------------------------------------------------
 
   /** An AI row's change on the latest document: one undo step, said in a toast with Undo. */
@@ -1958,6 +1976,7 @@ export function ClipEditor({
         onSpeed={speedPart}
         onLooks={editLooks}
         onFades={editFades}
+        onBlur={editBlur}
         ai={aiEffects}
       />
     ) : state.tab === 'text' ? (

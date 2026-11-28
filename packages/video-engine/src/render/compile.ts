@@ -45,15 +45,17 @@
  * ending in `loudnorm`'s JSON print, to `-f null -`.
  */
 
+import type { BlurRect } from '../document/blur';
 import { ASS_FILE, buildAss } from './ass';
 import { bleepMuteFilter, bleepSets, bleepToneSource } from './bleep-plan';
-import { type CompiledCommandFile, cropCommandText } from './crop-path';
-import { FONTS_DIR } from './fonts';
-import { ffmpegColour, formatNumber } from './filter-text';
-import { layoutGraph } from './layout-graph';
-import { type LoudnessDecision, loudnormApplyFilter, loudnormMeasureFilter } from './loudness';
-import { lookFilters } from './looks';
 import { cardsOf, type PlanCard, planBodyMs } from './card-plan';
+import { type CompiledCommandFile, cropCommandText } from './crop-path';
+import { duckExpression } from './duck';
+import { ffmpegColour, formatNumber } from './filter-text';
+import { FONTS_DIR } from './fonts';
+import { layoutGraph } from './layout-graph';
+import { lookFilters } from './looks';
+import { type LoudnessDecision, loudnormApplyFilter, loudnormMeasureFilter } from './loudness';
 import type { PlanSegment, RenderPlan } from './plan';
 import { type PlanSound, planHasSound } from './sound-plan';
 import type { PlanSticker } from './sticker-plan';
@@ -213,6 +215,8 @@ export function soundChain(sound: PlanSound, label: string): string {
   }
   parts.push('asetpts=PTS-STARTPTS', AUDIO_FORMAT);
   if (sound.volume !== 1) parts.push(`volume=${formatNumber(sound.volume)}`);
+  // Module 17 item 9: lowered under speech, the line `duckGainAt` draws in the preview.
+  if (sound.duck.length > 0) parts.push(`volume=volume='${duckExpression(sound.duck)}':eval=frame`);
   if (sound.fadeInMs > 0) parts.push(`afade=t=in:st=0:d=${msToSeconds(sound.fadeInMs)}`);
   if (sound.fadeOutMs > 0) {
     const start = msToSeconds(sound.itemMs - sound.fadeOutMs);
@@ -535,14 +539,16 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
   for (const input of plan.inputs) {
     const count = input.segmentCount;
     const list: SegmentSources[] = [];
+    // Module 17 item 18: blurred boxes first, on the whole picture, so every crop of it is blurred.
+    const picture = blurLines(input.index, input.blurs, lines);
     if (count <= 1) {
       list.push({
-        video: `[${input.index}:v]`,
+        video: picture,
         audio: input.hasAudio ? `[${input.index}:a]` : null,
       });
     } else {
       const videoLabels = Array.from({ length: count }, (_, k) => `[i${input.index}v${k}]`);
-      lines.push(`[${input.index}:v]split=${count}${videoLabels.join('')}`);
+      lines.push(`${picture}split=${count}${videoLabels.join('')}`);
       let audioLabels: string[] = [];
       if (input.hasAudio) {
         audioLabels = Array.from({ length: count }, (_, k) => `[i${input.index}a${k}]`);
@@ -820,4 +826,27 @@ export function outputArgsFor(plan: RenderPlan): string[] {
     '-f',
     'mp4',
   ];
+}
+
+/**
+ * Module 17 item 18: each box of an input cut out, blurred and laid back on
+ * the same spot (fractions of the picture, so no size is needed). The blur's
+ * radius is a sixth of the box's short side, strong enough that a face or
+ * text cannot be read. Returns the label of the blurred picture.
+ */
+function blurLines(index: number, blurs: readonly BlurRect[], lines: string[]): string {
+  let label = `[${index}:v]`;
+  blurs.forEach((blur, k) => {
+    const id = `i${index}b${k}`;
+    const x = formatNumber(blur.x);
+    const y = formatNumber(blur.y);
+    lines.push(
+      `${label}split=2[${id}m][${id}c]`,
+      `[${id}c]crop=w=iw*${formatNumber(blur.w)}:h=ih*${formatNumber(blur.h)}:x=iw*${x}:y=ih*${y},` +
+        `boxblur=luma_radius='min(w,h)/6':luma_power=2[${id}z]`,
+      `[${id}m][${id}z]overlay=x=main_w*${x}:y=main_h*${y}[${id}]`,
+    );
+    label = `[${id}]`;
+  });
+  return label;
 }

@@ -29,6 +29,7 @@ import { CANVAS_FPS, CANVASES, RATIOS } from '../canvas';
 import { hasEmoji } from './emoji';
 import {
   BADGE_NAME_MAX,
+  BLUR_MIN_SIZE,
   CAPTION_MAX_WORDS,
   CAPTION_SIZE_MAX,
   CAPTION_SIZE_MIN,
@@ -37,8 +38,10 @@ import {
   CLIP_MIN_MS,
   FADE_MAX_MS,
   ITEM_MIN_MS,
+  JOIN_FADE_MS,
   MAX_AREAS,
   MAX_BLEEPS,
+  MAX_BLURS,
   MAX_CAPTION_EDITS,
   MAX_CROP_KEYFRAMES,
   MAX_FOLLOW_OVERRIDES,
@@ -49,6 +52,9 @@ import {
   MAX_STICKERS,
   MAX_TRACKS,
   MAX_ZOOMS,
+  MONTAGE_MAX_CLIPS,
+  MONTAGE_MIN_CLIPS,
+  MONTAGE_PART_TITLE_MAX,
   SEGMENT_MIN_MS,
   SPEEDS,
   STICKER_SIZE_MAX,
@@ -59,10 +65,6 @@ import {
   TEXT_WIDTH_MIN,
   VOLUME_MAX,
   ZOOM_MAX,
-  JOIN_FADE_MS,
-  MONTAGE_MAX_CLIPS,
-  MONTAGE_MIN_CLIPS,
-  MONTAGE_PART_TITLE_MAX,
 } from './limits';
 
 /** Short ids made by the editor (`seg_3f9a`), or UUIDs. Never free text. */
@@ -555,6 +557,26 @@ export const bleepSchema = z
   .strict()
   .refine((b) => b.from < b.to, 'A bleep must end after it starts');
 
+/**
+ * Module 17 item 18: a part of one video blurred for the whole clip (a
+ * bystander, a screen), as a fraction of that video's picture, so it stays
+ * on the same spot whatever the crop, the layout or the zoom.
+ */
+export const blurSchema = z
+  .object({
+    id: idSchema,
+    source: idSchema,
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    w: z.number().min(BLUR_MIN_SIZE).max(1),
+    h: z.number().min(BLUR_MIN_SIZE).max(1),
+  })
+  .strict()
+  .refine(
+    (b) => b.x + b.w <= 1.000001 && b.y + b.h <= 1.000001,
+    'A blur must stay inside the video',
+  );
+
 export const trackSchema = z.discriminatedUnion('kind', [
   overlayTrackSchema,
   audioTrackSchema,
@@ -729,6 +751,8 @@ const documentShape = z
     /** Version 2 (Module 11): Fade joins between parts (a montage's Between Clips). Empty or absent: cuts. */
     joins: z.array(joinSchema).max(MAX_SEGMENTS).optional(),
     meta: documentMetaSchema.optional(),
+    /** Module 17 item 18: blurred parts of the video. Absent: none. */
+    blurs: z.array(blurSchema).max(MAX_BLURS).optional(),
   })
   .strict();
 
@@ -824,6 +848,17 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
 
   doc.layout.areas.forEach((area, i) => {
     claim(area.id, ['layout', 'areas', i, 'id']);
+  });
+
+  (doc.blurs ?? []).forEach((blur, i) => {
+    claim(blur.id, ['blurs', i, 'id']);
+    if (!sourceIds.has(blur.source)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['blurs', i, 'source'],
+        message: 'A blur points at a video the clip does not have',
+      });
+    }
   });
 
   doc.bleeps.forEach((bleep, i) => {
@@ -951,6 +986,7 @@ export type AudioTrack = z.infer<typeof audioTrackSchema>;
 export type CaptionsTrack = z.infer<typeof captionsTrackSchema>;
 export type CaptionEdit = z.infer<typeof captionEditSchema>;
 export type Bleep = z.infer<typeof bleepSchema>;
+export type Blur = z.infer<typeof blurSchema>;
 export type LayoutFollow = z.infer<typeof followSchema>;
 export type FollowOverride = z.infer<typeof followOverrideSchema>;
 export type SavedLayout = z.infer<typeof savedLayoutSchema>;
