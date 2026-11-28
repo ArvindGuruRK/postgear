@@ -292,6 +292,34 @@ describe('finishTranscribe', () => {
     expect(reversed).toEqual([JOB_ID]);
   });
 
+  it('refuses a language we cannot draw heard by Detect Automatically, keeping nothing (Module 16)', async () => {
+    const { run, rows, storage, internal } = setup();
+    const heard = putHeard(storage, { ...heardBody(WORDS), language: 'ja' });
+    await expect(finishTranscribe(run, heard, dir, internal)).rejects.toMatchObject({
+      code: 'language_unsupported',
+      retryable: false,
+    });
+    expect(storage.puts).toBe(0);
+    expect(storage.objects.has(heard.heardKey)).toBe(false);
+    expect(rows.assets.filter((row) => row.kind === 'TRANSCRIPT')).toEqual([]);
+    expect(rows.jobs.get(JOB_ID)?.status).not.toBe('DONE');
+  });
+
+  it('keeps a no-speech answer whatever language it names, and a supported one heard by auto', async () => {
+    const silent = setup();
+    const quiet = putHeard(silent.storage, { ...heardBody([]), language: 'ja' });
+    await expect(finishTranscribe(silent.run, quiet, dir, silent.internal)).resolves.toEqual({
+      finished: true,
+      noSpeech: true,
+    });
+    const tamil = setup();
+    const heard = putHeard(tamil.storage, { ...heardBody(WORDS), language: 'ta' });
+    await expect(finishTranscribe(tamil.run, heard, dir, tamil.internal)).resolves.toEqual({
+      finished: true,
+      noSpeech: false,
+    });
+  });
+
   it('refuses an answer that names any key but the job own heard file', async () => {
     const { run, storage, internal } = setup();
     const heard = putHeard(storage, heardBody(WORDS));

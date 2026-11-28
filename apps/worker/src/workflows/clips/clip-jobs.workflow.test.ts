@@ -180,6 +180,40 @@ describe('clipImportWorkflow', () => {
     expect(activities.clipJobSettled).toHaveBeenCalledWith(input);
   });
 
+  it('a step that ends after Cancel and finds its row closed still books the cancel (Module 16)', async () => {
+    let started: () => void = () => undefined;
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const activities = mocks({
+      clipImport: jest.fn(async () => {
+        const context = Context.current();
+        started();
+        while (!context.cancellationSignal.aborted) {
+          context.heartbeat();
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        // The last write found the video removed: the step answers closed, not a throw.
+        return { status: 'closed' as const };
+      }),
+    });
+
+    const outcome = await (await worker(activities)).runUntil(async () => {
+      const handle = await env.client.workflow.start(clipImportWorkflow, {
+        taskQueue: TASK_QUEUE,
+        workflowId: 'clip-import-cancel-closed',
+        args: [input],
+      });
+      await running;
+      await handle.signal(CANCEL_SIGNAL);
+      return handle.result();
+    });
+
+    expect(outcome).toBe('cancelled');
+    expect(activities.clipJobCancelled).toHaveBeenCalledWith(input);
+    expect(activities.clipJobFailed).not.toHaveBeenCalled();
+  });
+
   it('a job closed by someone else ends quietly', async () => {
     const activities = mocks({ clipImport: jest.fn().mockResolvedValue({ status: 'closed' }) });
     const outcome = await (await worker(activities)).runUntil(
@@ -191,6 +225,7 @@ describe('clipImportWorkflow', () => {
     );
     expect(outcome).toBe('closed');
     expect(activities.clipJobFailed).not.toHaveBeenCalled();
+    expect(activities.clipJobCancelled).not.toHaveBeenCalled();
   });
 });
 

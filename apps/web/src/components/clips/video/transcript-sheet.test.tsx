@@ -98,6 +98,15 @@ describe('TranscriptSheet', () => {
     await waitFor(() => expect(api.listenToVideo).toHaveBeenCalledWith(VIDEO, {}));
   });
 
+  it('reads out what listening is doing while it runs (Module 16)', async () => {
+    api.getVideoTranscript?.mockResolvedValue({ transcript: null, complete: false, price: 1 });
+    api.listenToVideo?.mockResolvedValue({ covered: false, job: { id: 'job-1' } });
+    setup();
+    fireEvent.click(await screen.findByTestId('clip-video-listen'));
+    const listening = await screen.findByTestId('clip-video-listening');
+    expect(within(listening).getByRole('status')).not.toBeEmptyDOMElement();
+  });
+
   it('opens on the words, with the unheard rest as a gap with its own Listen', async () => {
     api.getVideoTranscript?.mockResolvedValue(transcript());
     setup();

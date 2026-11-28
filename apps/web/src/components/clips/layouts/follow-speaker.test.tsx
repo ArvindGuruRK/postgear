@@ -44,7 +44,7 @@ import {
   planFollow,
 } from './follow-model';
 import { type LayoutEdit, LayoutsPanel } from './layouts-panel';
-import { type FollowSpeakerDeps, useFollowSpeaker } from './use-follow-speaker';
+import { FOLLOW_SKIPPED, type FollowSpeakerDeps, useFollowSpeaker } from './use-follow-speaker';
 
 jest.mock('@/lib/clips-api', () => ({
   ensureClipFaces: jest.fn(),
@@ -223,6 +223,10 @@ describe('the Follow The Speaker switch', () => {
     const { state } = renderEditor(fakes);
     fireEvent.click(theSwitch());
     expect(await screen.findByRole('progressbar', { name: FOLLOW_FINDING })).toBeInTheDocument();
+    // Module 16: the bar's words are read out too, not only drawn.
+    expect(within(screen.getByTestId('clip-follow-finding')).getByRole('status')).toHaveTextContent(
+      FOLLOW_FINDING,
+    );
     release();
     await waitFor(() => expect(state.history).toHaveLength(1));
     expect(screen.queryByTestId('clip-follow-finding')).toBeNull();
@@ -452,13 +456,29 @@ describe('following on first open', () => {
     expect(state.history).toHaveLength(1);
   });
 
-  it('is silent when nobody is found', async () => {
+  it('says the part was skipped, once, when nobody is found, and changes nothing (Module 16)', async () => {
     const fakes = deps(nobody());
     const { state } = renderEditor(fakes, tallClip(), { followOnOpen: true });
     await waitFor(() => expect(fakes.loadFile).toHaveBeenCalled());
     await act(async () => undefined);
     expect(state.history).toHaveLength(0);
     expect(screen.queryByText(NO_ONE_TO_FOLLOW)).toBeNull();
+    expect(fakes.notify).toHaveBeenCalledTimes(1);
+    expect(fakes.notify).toHaveBeenCalledWith(
+      'Follow The Speaker was skipped: we could not find anyone to follow.',
+    );
+    expect(FOLLOW_SKIPPED).toBe(
+      'Follow The Speaker was skipped: we could not find anyone to follow.',
+    );
+  });
+
+  it('stays silent when finding faces fails on first open', async () => {
+    const fakes = deps(null);
+    const { state } = renderEditor(fakes, tallClip(), { followOnOpen: true });
+    await waitFor(() => expect(fakes.loadFile).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(state.history).toHaveLength(0);
+    expect(fakes.notify).not.toHaveBeenCalled();
   });
 
   it('steps aside when the person changes the layout while the faces load (Module 10)', async () => {

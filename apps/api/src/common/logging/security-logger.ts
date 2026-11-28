@@ -45,6 +45,9 @@ const REDACTED_KEYS = [
   'accesskey',
   'access_key',
   'proxy',
+  // Clips AI (Sprint 13, Module 16): the media service's internal token
+  // travels in this header, whose name holds none of the words above.
+  'x-postgear-internal',
 ];
 
 const REDACTION_PLACEHOLDER = '[REDACTED]';

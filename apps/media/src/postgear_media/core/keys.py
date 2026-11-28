@@ -60,6 +60,15 @@ def is_valid_clip_key(key: object) -> bool:
     return isinstance(key, str) and len(key) <= 512 and CLIP_KEY_PATTERN.match(key) is not None
 
 
+def is_video_key(key: object, org_id: str, video_id: str) -> bool:
+    """True for a valid key among `video_id`'s own files in `org_id` (`clips/<org>/<video>/...`).
+
+    A job reads only the files of the video it names: a valid key of another
+    video or another workspace is refused too, however it reached the payload.
+    """
+    return is_valid_clip_key(key) and str(key).startswith(f"clips/{org_id}/{video_id}/")
+
+
 def assert_valid_clip_key(key: object) -> str:
     """The key, or `InvalidKeyError` for anything outside the private shapes."""
     if not is_valid_clip_key(key):

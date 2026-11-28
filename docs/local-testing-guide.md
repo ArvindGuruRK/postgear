@@ -1176,6 +1176,8 @@ npm run test:e2e -- e2e/clips.spec.ts e2e/operator.spec.ts   # needs dev:api:e2e
 
 Clips AI adds a second service: **`apps/media`**, a small Python program that does the sound and picture work (speech to text, faces, motion). The TypeScript worker still decides the order of every step; Python only answers. Locally it runs in simulation, so **no AI model is ever downloaded** and nothing is paid for.
 
+**In short, to run Clips AI locally:** install [uv](https://docs.astral.sh/uv/); `cd apps/media && uv sync`; add the "CLIPS AI" block of `.env.example` to `.env` (`MEDIA_INTERNAL_TOKEN` from `npm run generate:keys`); `npm run clips:doctor` and `npm run clips:samples` once; then `npm run dev`, which starts the Python service too. Keep `CLIPS_SIMULATION`, `MEDIA_SIMULATION`, `AI_SIMULATION` and `PUBLISH_SIMULATION` set to `"true"`. The details follow.
+
 **What to install.** [uv](https://docs.astral.sh/uv/) (it installs the right Python, 3.13, by itself). Then, once:
 
 ```bash
@@ -1523,6 +1525,47 @@ npx jest --config apps/web/jest.config.js src/components/clips/schedule src/comp
 npx jest --config apps/api/jest.config.js src/modules/clips/jobs src/modules/clips/costs src/modules/clips/audit src/modules/clips/retention src/modules/admin/costs
 npx jest --config apps/web/jest.config.js src/components/operator src/components/clips/setup src/components/clips/audit
 npm run test --workspace=@postgear/media -- -k hosted_lane
+```
+
+**Hardening And Release Checks (Module 16).** Nothing new to click: this module tested every rule and edge case of Sprints 12 and 13, fixed what failed, and wrote the two end to end suites. What a person sees that changed:
+
+- An Editor refused anywhere (connecting a channel, billing, an admin page) now reads "Editors cannot do this. Ask an admin." everywhere, not "You do not have permission to do that".
+- A clip that Auto-Edit or Clip Setup asked to follow the speaker, opened with nobody in it, shows the toast "Follow The Speaker was skipped: we could not find anyone to follow."
+- Detect Automatically on a video in a language we cannot draw fails with "We cannot make captions in this language yet. Pick another language." and the AI minutes come back (before, it stored a transcript with no font to draw it).
+- The random time picker says "That part of the day is full. Try another." when every minute of that part already has a post (it used to say the part had passed).
+- A caption page with one very long word (or a long Tamil or Hindi word) is drawn smaller in the preview and the export alike, so it never leaves its box.
+
+**Every forcing switch in one place.** All of them work only under simulation; with real providers each is just a title.
+
+| Switch | Where | What you see |
+|---|---|---|
+| `https://www.twitch.tv/videos/900000012`, `[simulate:listen-fail]` | link or video title | Listening fails, the minutes come back |
+| `https://www.twitch.tv/videos/900000013`, `[simulate:listen-slow]` | link or title | Listening holds about 10 seconds (time to Cancel) |
+| `https://www.twitch.tv/videos/900000014`, `[simulate:no-speech]` | link or title | "We could not hear any speech in this video." and the minutes come back |
+| `https://www.twitch.tv/videos/900000008`, `[simulate:highlights-slow]` | link or title | Find Clips holds scoring 30 seconds (time to Cancel, or to fill the queue) |
+| `[simulate:action-fail]`, `[simulate:action-slow]`, `[simulate:stills-fail]` | title | Look For Action fails, holds, or keeps its clips with no sentence |
+| `[simulate:faces-fail]`, `[simulate:faces-slow]` | title | Finding faces fails or holds |
+| `https://www.youtube.com/watch?v=simtalk0001`, or any upload | link | No face anywhere: Follow The Speaker and Detect Camera say so |
+| `[simulate:emote-too-big]` | title | Emote Maker's orange warning naming the site and its size |
+| `[simulate:model-bad-rows]` | Clip Setup, "What should we look for?" | The model answers rows that do not exist; the run finishes with fewer clips and the API log line `clips.moments.read` shows `dropped` above 0 |
+| `[simulate:translate-short]` | a caption line | The translation comes back one line short, is refused, the minute comes back |
+| `simvacation`, `simnoschedule`, `simnouser` | Schedule Maker's Twitch name | A break, seven Off rows, or "We could not find that Twitch channel." |
+| `CLIPS_MEDIA_SLOTS=1` (restart the API and worker) | `.env` | With 900000008 running, a second Find Clips says "Waiting for our turn, about 2 minutes" |
+
+**Try an Editor.** As the demo admin open **Settings, Team**, press **Invite Member**, pick **Editor**, enter the new person's address (an Editor's link works only for that address), untick **Send invitation by email** and press **Copy Link**. (Left ticked, the mail is printed in the API console, never sent.) Open the link in a private window, sign up with that address and accept. The Editor sees a shorter rail (no Analytics, Workflows, Discover or SEO), can make clips and designs, and the composer offers only **Save As Draft**. A second Editor invite on a plan with one seat is refused before any link exists.
+
+**The end to end suites.** Start Docker, `npm run db:seed`, once `CLIPS_LIBRARY_INGEST=true npm run clips:library:seed` (Sprint 12's suite adds a sticker and a sound from the open library; on a machine with no FFmpeg of its own set `FFMPEG_PATH` and `FFPROBE_PATH` to the wrappers in `infra/docker/worker/bin`), the API with `npm run dev:api:e2e` (and the simulation switches), the Node worker and `npm run dev:media`; Playwright starts the web app itself.
+
+```bash
+npm run test:e2e -- e2e/clips.spec.ts --workers=1      # Sprint 12, unchanged
+npm run test:e2e -- e2e/clips-ai.spec.ts --workers=1   # Sprint 13: 19 tests, about 6.5 minutes on a quiet machine
+```
+
+**Unit checks for the sweep.** The security and edge-case tests are named `*.security.spec.ts`, `*.security.test.ts`, `*.edge-cases.*` and `apps/media/tests/test_*_security.py` / `test_edge_cases.py`. The meter's race tests need the real Postgres:
+
+```bash
+CLIPS_AI_LEDGER_DB_TEST=1 npx dotenv -e .env -- npx jest --config apps/api/jest.config.js ai-minutes.security
+EDITOR_SEATS_DB_TEST=1 npx dotenv -e .env -- npx jest --config apps/api/jest.config.js editor-seats.race
 ```
 
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.

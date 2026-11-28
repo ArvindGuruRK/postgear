@@ -920,6 +920,10 @@ Four migrations, `20261128140000` to `20261128140300`:
 - **`ClipJobKind.EMOTE`** (`sprint13_clip_job_emote`): one Emote Maker export. Its input and output live in the job's JSON like every other kind (`packages/video-engine/src/jobs.ts`), and its files expire with the job (24 hours).
 - **`Post.createdById`** (`sprint13_post_created_by`): a plain nullable id with no foreign key, like `Clip.createdById`, so a person leaving keeps their posts. Written on create from the person saving (composer, Send To Composer, Studio Send, the Copilot); null for workflows and the public API. Old rows stay null.
 
+### Design documents at schema version 3 (Module 14, no migration)
+
+`Design.document` is JSON, so the Schedule Maker's additions needed no migration: `packages/design-engine` raised `DESIGN_SCHEMA_VERSION` to 3 for the `rows` slot (a labelled table of at most seven rows) and the optional schedule source. `upgrade()` in `packages/design-engine/src/schema.ts` is the only way a stored document moves forward; the step from 2 to 3 changes nothing but the number, because a design saved before has neither field. A stored version newer than the code throws `DesignVersionError` instead of drawing half a design.
+
 ### `ClipJob.costCents` and `ClipJob.cost` (Module 15, `20261128160000_sprint13_clip_job_cost`)
 
 - **Two nullable columns, not a field in `output`.** Every kind's output shape is `.strict()` (`packages/video-engine/src/jobs.ts`) and the job view reads it field by field, so a cost inside it would either break every result or need eleven schema edits; a failed or cancelled job (no output) still cost us something. `costCents` is the sum the operator route adds up; `cost` holds the facts it came from (seconds of video, seconds run, provider, units, the price table's date, and whether the units were estimated).

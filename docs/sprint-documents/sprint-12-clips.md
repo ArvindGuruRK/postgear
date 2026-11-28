@@ -534,6 +534,8 @@ Changes to the first plan of 2026-11-14 (FFmpeg only, entitlements, the open lib
 - **The overrides ending in 7 days are worked out when the Plans tab is read**, not stored by the daily sweep (Module 19).
 - **Some checks run only on a machine that has the tools, not in CI:** the render parity tests (CI has no pinned FFmpeg with libass; they skip with a warning), the ledger load test (CI has no Postgres; it shows as skipped and runs with `CLIPS_LEDGER_DB_TEST=1`) and the worker image proof (`docker compose --profile worker-image`). All three passed locally on 2026-11-19 (Module 20).
 
+**Changed later by Sprint 13** (each in [Sprint 13's Deviations](sprint-13-clips-ai.md#deviations) and its Decision Log): version 1 clips gain 15 ms sound fades at real cuts (the regression set still passes); every Clips job is started by one scheduler with slots per class, and the worker's `WORKER_MEDIA_CONCURRENCY` default is 6; channel connect needs a workspace role, so a request with no workspace answers 403; "This job was not found." became the shared "We could not find this. It may have been removed." in the Sprint 13 services that still said it.
+
 ## Risks
 
 See [`../sprint-12/research/07-legal-limits-cost-and-risks.md`](../sprint-12/research/07-legal-limits-cost-and-risks.md) for the register. The ones that shape the build:

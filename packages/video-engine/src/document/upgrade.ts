@@ -35,6 +35,14 @@ const MAX_ISSUES = 20;
 const MAX_PATH_PART = 32;
 
 /**
+ * Module 16: a path part is written only when it reads as a field name or an
+ * index. A record key the schema refused (a caption edit's word index) is
+ * input, so anything else is written as `?` and never reaches a log or an
+ * answer.
+ */
+const PLAIN_PATH_PART = /^[A-Za-z0-9_]+$/;
+
+/**
  * The one error a document read throws. `issues` are short sentences with a
  * path, safe to show a developer or put in a log.
  */
@@ -126,6 +134,7 @@ function formatPath(path: readonly (string | number)[]): string {
   return path
     .map((part) => {
       const text = String(part);
+      if (!PLAIN_PATH_PART.test(text)) return '?';
       return text.length > MAX_PATH_PART ? `${text.slice(0, MAX_PATH_PART)}...` : text;
     })
     .join('.');

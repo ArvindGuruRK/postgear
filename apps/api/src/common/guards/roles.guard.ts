@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { type Role, prisma } from '@postgear/db';
+import { prisma, Role } from '@postgear/db';
+import { EDITOR_FORBIDDEN_SENTENCE } from '@postgear/entitlements';
 import type { Request } from 'express';
 import { AUTH_MESSAGES } from '../../modules/auth/auth.messages';
 import type { ActiveOrg } from '../decorators/current-org.decorator';
@@ -125,7 +126,14 @@ export class RolesGuard implements CanActivate {
         role: request.activeOrg.role,
         required: requiredRoles,
       });
-      throw new ForbiddenException(AUTH_MESSAGES.FORBIDDEN);
+      // An Editor reads the one sentence the stories give every refused
+      // Editor (Module 16), as the posts wall already answers. Only a member
+      // gets it: the not-a-member branch above stays one answer for all.
+      throw new ForbiddenException(
+        request.activeOrg.role === Role.EDITOR
+          ? { message: EDITOR_FORBIDDEN_SENTENCE, code: 'editor_forbidden' }
+          : AUTH_MESSAGES.FORBIDDEN,
+      );
     }
 
     return true;

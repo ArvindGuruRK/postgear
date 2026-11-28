@@ -324,7 +324,9 @@ export function TranscriptSheet({
           {jobId !== null ? (
             <div className="flex flex-col gap-2" data-testid="clip-video-listening">
               <Progress tone="ai" value={job?.progress ?? 0} aria-label="Listening to this video" />
-              <p className={NOTE}>{queuedOr(job, 'Listening to what is said')}</p>
+              <p className={NOTE} role="status">
+                {queuedOr(job, 'Listening to what is said')}
+              </p>
               <WaitingNote job={job} className={NOTE} />
             </div>
           ) : null}

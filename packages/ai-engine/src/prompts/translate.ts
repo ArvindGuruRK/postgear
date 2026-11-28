@@ -5,7 +5,7 @@
  * joins or drops a line is asked again, never trusted.
  */
 import { z } from 'zod';
-import { block, field } from './fields';
+import { block, field, quotedLine } from './fields';
 
 export const TRANSLATE_MAX_LINES = 400;
 export const TRANSLATE_MAX_LINE_CHARS = 600;
@@ -44,7 +44,10 @@ export function buildTranslatePrompt(input: TranslatePromptInput): {
     field('To', input.to),
     field('To code', input.toCode),
     field('Lines', input.lines.length),
-    block('Captions', input.lines.map((line, index) => `${index + 1}. ${line}`).join('\n')),
+    block(
+      'Captions',
+      input.lines.map((line, index) => `${index + 1}. ${quotedLine(line)}`).join('\n'),
+    ),
   ].join('\n');
 
   return { system, user };

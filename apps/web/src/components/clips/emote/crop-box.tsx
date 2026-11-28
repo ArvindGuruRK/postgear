@@ -9,9 +9,11 @@
  * frame's shape, so percentages map one to one.
  *
  * Under 112 source pixels a muted line warns "This will look soft."
+ * After a keyboard step a polite status says the new size and place
+ * (`cropSaid`), since the box moving is only seen (Module 16).
  */
 import type { EmoteCrop, EmoteFrame } from '@postgear/video-engine';
-import { type KeyboardEvent, type PointerEvent, useRef } from 'react';
+import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
 import { clampCrop, isSoft, SOFT_NOTE } from './emote-model';
 
 export interface CropBoxProps {
@@ -23,9 +25,15 @@ export interface CropBoxProps {
 
 type Drag = { mode: 'move' | 'resize'; x: number; y: number; start: EmoteCrop; scale: number };
 
+/** "200 pixels square, 20 from the left, 0 from the top.": read out after a keyboard step. */
+export function cropSaid(crop: EmoteCrop): string {
+  return `${crop.size} pixels square, ${crop.x} from the left, ${crop.y} from the top.`;
+}
+
 export function CropBox({ frame, crop, onChange, disabled }: CropBoxProps) {
   const layer = useRef<HTMLDivElement | null>(null);
   const drag = useRef<Drag | null>(null);
+  const [said, setSaid] = useState('');
 
   const begin = (mode: Drag['mode']) => (event: PointerEvent<HTMLElement>) => {
     if (disabled || event.button !== 0) return;
@@ -87,9 +95,12 @@ export function CropBox({ frame, crop, onChange, disabled }: CropBoxProps) {
     const delta = moves[event.key];
     if (!delta) return;
     event.preventDefault();
-    onChange(
-      clampCrop({ x: crop.x + delta[0], y: crop.y + delta[1], size: crop.size + delta[2] }, frame),
+    const next = clampCrop(
+      { x: crop.x + delta[0], y: crop.y + delta[1], size: crop.size + delta[2] },
+      frame,
     );
+    onChange(next);
+    setSaid(cropSaid(next));
   };
 
   const percent = (value: number, of: number) => `${(value / of) * 100}%`;
@@ -128,6 +139,9 @@ export function CropBox({ frame, crop, onChange, disabled }: CropBoxProps) {
           onPointerCancel={end}
         />
       </button>
+      <span role="status" className="sr-only" data-testid="emote-crop-said">
+        {said}
+      </span>
     </div>
   );
 }

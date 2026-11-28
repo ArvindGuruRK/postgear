@@ -39,7 +39,7 @@ from postgear_media.contract.generated import (
     MediaPyTranscribeInput,
     MediaPyTranscribeOutput,
 )
-from postgear_media.core.keys import assert_valid_clip_key
+from postgear_media.core.keys import assert_valid_clip_key, is_video_key
 from postgear_media.core.logging import get_logger
 from postgear_media.core.scratch import scratch_folder
 from postgear_media.core.storage import PrivateStorage, StorageNotFoundError
@@ -78,6 +78,8 @@ class TranscribeDeps:
     #: `TRANSCRIBER=auto`: the hosted lane for long jobs; `transcriber` is then
     #: our own machine, which takes every other job and any hosted failure.
     hosted: HostedLane | None = None
+    #: True when no attempt follows a retryable failure of this one (its last try).
+    last_attempt: Callable[[], bool] = lambda: False
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,15 +283,43 @@ def _listen_all(
     return _Listened(pieces=pieces, language=found_language, probability=probability)
 
 
+def _never_retried(error: BaseException, deps: TranscribeDeps) -> bool:
+    """True when no later attempt will read this job's finished chunks."""
+    if isinstance(error, Cancelled):
+        return True
+    if isinstance(error, ApplicationError) and error.non_retryable:
+        return True
+    return deps.last_attempt()
+
+
 def transcribe(payload: MediaPyTranscribeInput, deps: TranscribeDeps) -> MediaPyTranscribeOutput:
-    """Listens to the asked stretches and stores the heard file."""
+    """Listens to the asked stretches and stores the heard file.
+
+    The finished chunks (words already heard) are kept across attempts on this
+    box so a retry starts where the last one stopped. They go when the job
+    succeeds, and as soon as no attempt can follow: a cancel, a failure a retry
+    cannot fix, or the last try. Only a killed process leaves them, for the
+    boot sweep a day later.
+    """
+    if not is_video_key(payload.audio_key, payload.org_id, payload.video_id):
+        raise bad_input("A job reads only the files of its own video")
+    done_dir = deps.scratch_root / f"{payload.job_id}-chunks"
+    try:
+        return _transcribe(payload, deps, done_dir)
+    except BaseException as error:
+        if _never_retried(error, deps):
+            shutil.rmtree(done_dir, ignore_errors=True)
+        raise
+
+
+def _transcribe(
+    payload: MediaPyTranscribeInput, deps: TranscribeDeps, done_dir: Path
+) -> MediaPyTranscribeOutput:
     language = None if payload.language == "auto" else payload.language
     hint = payload.simulation if deps.simulated else None
     # The generated model wraps a nullable pattern string; the listener takes plain text.
     sample = str(hint.sample.root) if hint and hint.sample else None
     force = hint.force if hint else None
-    # Kept across attempts on this box; removed when the job succeeds, swept after a day otherwise.
-    done_dir = deps.scratch_root / f"{payload.job_id}-chunks"
 
     with scratch_folder(deps.scratch_root, payload.job_id) as folder:
         audio_path = folder / "analysis.wav"

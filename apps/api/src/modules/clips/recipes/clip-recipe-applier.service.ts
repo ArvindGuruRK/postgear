@@ -686,5 +686,5 @@ function errorName(error: unknown): string {
 }
 
 function jobNotFound(): NotFoundException {
-  return new NotFoundException({ message: 'This job was not found.', code: 'job_not_found' });
+  return new NotFoundException({ message: CLIPS_MESSAGES.JOB_NOT_FOUND, code: 'job_not_found' });
 }

@@ -105,7 +105,32 @@ export class ClipJobsRepository {
       where: { id: jobId, organizationId: orgId, status: { in: [...OPEN_JOB_STATUSES] } },
       data: { status: ClipJobStatus.CANCELLED, error, finishedAt: new Date() },
     });
+    if (result.count > 0) await this.wipeDriveToken(jobId);
     return result.count > 0;
+  }
+
+  /**
+   * Module 16: an import from Google Drive carries its sealed access token in
+   * the job's input until the file is stored. The worker wipes it on its own
+   * failure and cancel paths; `cancelOpen` and `failOpen` close a job the
+   * worker never finished, so they wipe it too. The job is closed by then,
+   * so nothing else writes its input.
+   */
+  private async wipeDriveToken(jobId: string): Promise<void> {
+    const job = await prisma.clipJob.findFirst({
+      where: { id: jobId, kind: ClipJobKind.IMPORT },
+      select: { input: true },
+    });
+    const input = job?.input as { origin?: { drive?: { token?: string | null } } } | null;
+    if (!input?.origin?.drive || input.origin.drive.token == null) return;
+    const wiped = {
+      ...input,
+      origin: { ...input.origin, drive: { ...input.origin.drive, token: null } },
+    };
+    await prisma.clipJob.updateMany({
+      where: { id: jobId, kind: ClipJobKind.IMPORT },
+      data: { input: wiped as Prisma.InputJsonValue },
+    });
   }
 
   /**
@@ -471,6 +496,7 @@ export class ClipJobsRepository {
       where: { id: jobId, status: { in: [...OPEN_JOB_STATUSES] } },
       data: { status: ClipJobStatus.FAILED, error, finishedAt: now },
     });
+    if (result.count > 0) await this.wipeDriveToken(jobId);
     return result.count > 0;
   }
 }

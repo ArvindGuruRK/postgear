@@ -43,6 +43,7 @@ import { AI_ENGINE, type AiEngine } from '../../ai/engine/engine.types';
 import { UsageService } from '../../entitlements/usage.service';
 import { ClipErrorException } from '../clip-error.exception';
 import { liveChargeUnder } from '../clips-ai-charges';
+import { CLIPS_MESSAGES } from '../clips.messages';
 import { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import { readChargeKey } from './clip-highlights.service';
@@ -218,5 +219,5 @@ export class ClipMomentsService {
 }
 
 function notFound(): NotFoundException {
-  return new NotFoundException({ message: 'This job was not found.', code: 'job_not_found' });
+  return new NotFoundException({ message: CLIPS_MESSAGES.JOB_NOT_FOUND, code: 'job_not_found' });
 }

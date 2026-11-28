@@ -32,12 +32,12 @@ from postgear_media.contract.generated import (
     MediaPyDetectFacesInput,
     MediaPyDetectFacesOutput,
 )
-from postgear_media.core.keys import job_file_key
+from postgear_media.core.keys import is_video_key, job_file_key
 from postgear_media.core.scratch import scratch_folder
 from postgear_media.core.storage import PrivateStorage, StorageNotFoundError
 from postgear_media.providers.vision.simulated_faces import recorded_faces
 from postgear_media.services.frames import Frame, FrameSource, sample_times
-from postgear_media.services.motion import checked_ranges
+from postgear_media.services.motion import bad_input, checked_ranges
 
 RATE_HZ = 5
 MAX_WIDTH = 640
@@ -165,6 +165,8 @@ def _key_missing() -> ApplicationError:
 def detect_faces(payload: MediaPyDetectFacesInput, deps: FacesDeps) -> MediaPyDetectFacesOutput:
     """Looks for faces in the asked stretches and stores the face file."""
     ranges = checked_ranges(payload.ranges, payload.duration_ms)
+    if not is_video_key(payload.proxy_key, payload.org_id, payload.video_id):
+        raise bad_input("A job reads only the files of its own video")
     with scratch_folder(deps.scratch_root, payload.job_id) as folder:
         if deps.simulated:
             if not deps.storage.exists(payload.proxy_key):

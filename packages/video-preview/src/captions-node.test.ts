@@ -258,6 +258,28 @@ describe('captions in the overlay layer', () => {
     expect(popped.style.fontSize).toBe('');
   });
 
+  it('draws a page with one too-wide word at the export page scale, and a page that fits as it is', () => {
+    const { layer, block } = mounted();
+    const long = 'Pneumonoultramicroscopicsilicovolcanoconiosis'.repeat(2);
+    const { doc, layout } = laidOut('bold-pop', [long, 'and', 'so']);
+    const scale = layout.pages[0]?.scale;
+    expect(scale).toBeDefined();
+    expect(scale as number).toBeLessThan(1);
+    layer.setCaptions(layout);
+    layer.update(frameState(doc, 1_050), UPDATE);
+    const rows = [...(block()?.querySelectorAll<HTMLElement>(':scope > div') ?? [])];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.style.fontSize === `${scale}em`)).toBe(true);
+
+    const fits = mounted();
+    const plain = laidOut('bold-pop', ['So', 'today', 'we']);
+    expect(plain.layout.pages[0]?.scale).toBeUndefined();
+    fits.layer.setCaptions(plain.layout);
+    fits.layer.update(frameState(plain.doc, 1_050), UPDATE);
+    const plainRows = [...(fits.block()?.querySelectorAll<HTMLElement>(':scope > div') ?? [])];
+    expect(plainRows.every((row) => row.style.fontSize === '')).toBe(true);
+  });
+
   it('sits under every text and takes its block away when the clip loses its captions', () => {
     const { layer, block } = mounted();
     const { doc, layout } = laidOut('clean', ['So', 'today']);

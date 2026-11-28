@@ -1,6 +1,6 @@
 # Module 16: Hardening, E2E And Sprint Close-Out
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session, may need a second)
+> **Sprint 13, Clips AI** | Status: Done (2026-11-28, simulation only; validate red on seven old tests) | Size: L (one full session, may need a second)
 > **Depends on**: Modules 01 to 15
 > **Stories**: the section 6 checklist of the user stories
 > **Next**: [the real-test plan](../real-test-plan.md), then [Module 17](module-17-p2-backlog.md) only on Arvind's word
@@ -121,15 +121,15 @@ Real FFmpeg exports happen in three places only (a single clip, the small batch,
 
 ## Tasks
 
-- [ ] The sweep table: a test per line (including the new Editor, Emote, Schedule, meter and ASS rows); fixes; `security-review` on the diff.
-- [ ] A test for each row of the stories' section 5; the forcing switches.
-- [ ] `e2e/clips-ai.spec.ts` (19 tests in the groups above, under seven minutes) green; `e2e/clips.spec.ts` still green.
-- [ ] The regression set: parse, render plan, export, compare; old Studio designs; fix any difference.
-- [ ] Performance checks; accessibility review and fixes; the look pass with its checklist.
-- [ ] Docs: testing guide, `.env.example`, `CLAUDE.md`, SCHEMA_NOTES, Deviations, index rows.
-- [ ] `npm run validate` green, Python included.
-- [ ] The completion checklist through `sprint-closeout`.
-- [ ] Update the Progress table and the Decision Log; set the sprint doc's Definition Of Done boxes honestly.
+- [x] The sweep table: a test per line (including the new Editor, Emote, Schedule, meter and ASS rows); fixes; `security-review` on the diff (no findings).
+- [x] A test for each row of the stories' section 5 (35 rows); the forcing switches (two new: the no-speech link and `[simulate:model-bad-rows]`).
+- [x] `e2e/clips-ai.spec.ts` (19 tests in the groups above, under seven minutes) green (6.4 minutes; a rerun after the look pass took 11.5 on a busier machine); `e2e/clips.spec.ts` still green (18 of 18, brought up to date with the UI).
+- [x] The regression set: parse, render plan, export, compare (5 of 5 with real FFmpeg, v1 fixtures 16 of 16); old Studio designs (60 of 60, and `seed-design-single` exported by hand); no difference found.
+- [x] Performance checks; accessibility review and fixes; the look pass with its checklist (`docs/design-patterns/sprint-13-clips-ai-look-pass.md`). **A real screen reader run and a 200 percent zoom check were not done** (headless only).
+- [x] Docs: testing guide, `.env.example`, `CLAUDE.md`, SCHEMA_NOTES, Deviations, index rows.
+- [ ] `npm run validate` green, Python included. **Not quite**: lint and typecheck green, Python 291, and tests green apart from seven failures that predate Sprint 13's last modules (3 Clips API specs on stickers, sounds and files, web `video-card`, media-tools `runner.test`, discover-engine `ics.test`, the timing-dependent Discover `reader.extractor.spec`).
+- [x] The completion checklist through `sprint-closeout` (`docs/sprint-completion-checklists/sprint-13-completion-checklist.md`).
+- [x] Update the Progress table and the Decision Log; set the sprint doc's Definition Of Done boxes honestly.
 
 ## Tests
 

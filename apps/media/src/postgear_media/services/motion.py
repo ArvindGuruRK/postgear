@@ -27,7 +27,7 @@ from typing import Any
 from temporalio.exceptions import ApplicationError
 
 from postgear_media.contract.generated import MediaPyMotionInput, MediaPyMotionOutput, MotionFile
-from postgear_media.core.keys import job_file_key
+from postgear_media.core.keys import is_video_key, job_file_key
 from postgear_media.core.scratch import scratch_folder
 from postgear_media.core.storage import PrivateStorage, StorageNotFoundError
 from postgear_media.providers.vision.simulation import recorded_motion
@@ -161,6 +161,8 @@ def measure_motion(payload: MediaPyMotionInput, deps: VisualDeps) -> MediaPyMoti
     """Measures the asked stretches and stores the motion file."""
     ranges = checked_ranges(payload.ranges, payload.duration_ms)
     proxy_key = payload.proxy_key
+    if not is_video_key(proxy_key, payload.org_id, payload.video_id):
+        raise bad_input("A job reads only the files of its own video")
     with scratch_folder(deps.scratch_root, payload.job_id) as folder:
         if deps.simulated:
             if not deps.storage.exists(proxy_key):

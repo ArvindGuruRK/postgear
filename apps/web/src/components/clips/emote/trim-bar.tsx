@@ -5,7 +5,9 @@
  * and a 10 second close-up with one draggable window. The window moves in
  * tenths of a second and will not stretch past 3.0 seconds; its edges set
  * the start and the end. The length shows beside it. Arrow keys on the
- * window move it a tenth (Shift: a second).
+ * window move it a tenth (Shift: a second); Up and Down make it a tenth
+ * longer or shorter, so the length is set without a pointer too (Module 16).
+ * The Start slider reads its place as a time, not as milliseconds.
  *
  * A long video makes a 3 second window too small to grab on a whole-video
  * bar, hence the two parts: the Start slider for the place, the close-up for
@@ -97,6 +99,12 @@ export function TrimBar({ durationMs, stretch, onChange, playheadMs, disabled }:
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (disabled) return;
     const step = event.shiftKey ? 1_000 : EMOTE_STEP_MS;
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      const grow = event.key === 'ArrowUp' ? EMOTE_STEP_MS : -EMOTE_STEP_MS;
+      onChange(clampStretch({ ...stretch, lengthMs: stretch.lengthMs + grow }, durationMs));
+      return;
+    }
     const delta = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
     if (delta === 0) return;
     event.preventDefault();
@@ -121,7 +129,7 @@ export function TrimBar({ durationMs, stretch, onChange, playheadMs, disabled }:
           step={EMOTE_STEP_MS}
           value={[stretch.startMs]}
           disabled={disabled}
-          aria-label="Start"
+          thumbs={[{ 'aria-label': 'Start', 'aria-valuetext': clockLabel(stretch.startMs) }]}
           onValueChange={([value]) =>
             onChange(clampStretch({ ...stretch, startMs: value ?? stretch.startMs }, durationMs))
           }
@@ -161,7 +169,8 @@ export function TrimBar({ durationMs, stretch, onChange, playheadMs, disabled }:
             aria-valuemin={0}
             aria-valuemax={durationMs}
             aria-valuenow={stretch.startMs}
-            aria-valuetext={`${clockLabel(stretch.startMs)} to ${clockLabel(endMs)}`}
+            aria-valuetext={`${clockLabel(stretch.startMs)} to ${clockLabel(endMs)}, ${secondsLabel(stretch.lengthMs)}`}
+            aria-description="Left and right move it, up and down make it longer or shorter."
             className="absolute inset-y-1 cursor-grab touch-none rounded-sm border-2 border-outline bg-actionSecondary/60 outline-none focus-visible:ring-2 focus-visible:ring-actionPrimary"
             style={{ left: at(stretch.startMs), width: `${(stretch.lengthMs / spanMs) * 100}%` }}
             onPointerDown={begin('move')}

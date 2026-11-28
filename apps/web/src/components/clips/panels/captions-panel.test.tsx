@@ -139,6 +139,8 @@ describe('before a clip has captions', () => {
     }
     const add = screen.getByTestId('clip-captions-add');
     expect(add).toHaveTextContent('Add Captions (2 AI Minutes)');
+    // Module 16: it spends AI minutes, so it is violet like every other AI action in Clips.
+    expect(add.className).toContain('bg-actionAi');
     fireEvent.click(screen.getByRole('button', { name: 'Karaoke' }));
     fireEvent.click(add);
     expect(captions.add).toHaveBeenCalledWith({ styleId: 'karaoke', language: 'auto' });
@@ -168,6 +170,13 @@ describe('before a clip has captions', () => {
     show({ captions });
     expect(screen.getByTestId('clip-captions-listening')).toHaveTextContent(
       'Listening to this clip. You can keep editing.',
+    );
+    // Module 16: the step is read out as it changes, on the violet bar every AI job uses.
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Listening to this clip. You can keep editing.',
+    );
+    expect(screen.getByRole('progressbar', { name: 'Listening to this clip' }).innerHTML).toContain(
+      'bg-actionAi',
     );
     expect(screen.queryByTestId('clip-captions-add')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -247,6 +256,8 @@ describe('with captions', () => {
     show({ track, layout, captions, translatePrice: 1 });
     const button = screen.getByTestId('clip-captions-translate');
     expect(button).toHaveTextContent('Translate To Tamil (1 AI Minute)');
+    // Module 16: a long language name wraps onto a second line instead of running out.
+    expect(button.className).toContain('whitespace-normal');
     fireEvent.click(button);
     expect(captions.translate).toHaveBeenCalledWith('ta');
   });

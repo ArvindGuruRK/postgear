@@ -1,4 +1,6 @@
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, rmSync, writeFileSync } from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   type APIRequestContext,
   type BrowserContext,
@@ -36,6 +38,7 @@ import {
   waitForJob,
   waitForVideoReady,
 } from './helpers/clips';
+import { importLink } from './helpers/clips-ai';
 
 /**
  * Sprint 12 Clips, end to end (Module 20 section 3): the journeys,
@@ -403,8 +406,11 @@ test('6. Find Clips shows its price, its steps, scored clips and a flag; the AI 
   const chip = find.getByTestId('clips-ai-minutes');
   await expect(chip).toContainText('AI minutes left', { timeout: 30_000 });
   const before = parseAiChip(await chip.innerText());
-  const button = find.getByRole('button', { name: /^Find Clips \(\d+ AI Minutes?\)$/ });
-  await expect(button).toBeVisible({ timeout: 30_000 });
+  // Since Sprint 13 (Module 05) Find Clips opens Clip Setup, and the one-press run
+  // Sprint 12 had is Quick Find, under More Ways To Find Clips beside it.
+  await find.getByTestId('find-clips-more').click();
+  const button = page.getByTestId('find-clips-quick');
+  await expect(button).toHaveText(/^Quick Find \(\d+ AI Minutes?\)$/, { timeout: 30_000 });
   const price = Number(/\((\d+) AI/.exec(await button.innerText())?.[1]);
   expect(price).toBeGreaterThan(0);
 
@@ -643,11 +649,19 @@ test('10. (part 2) The Free workspace has the 1080p plan lock', async () => {
   expect(doc.layout.kind).toBe('split');
 
   // 1080p is locked, in the panel and at the API.
-  const freeVideo = await prisma.clipVideo.findFirst({
+  let freeVideo = await prisma.clipVideo.findFirst({
     where: { organizationId: SECOND_ORG, status: 'READY', deletedAt: null },
     select: { id: true },
   });
-  if (!freeVideo) throw new Error('The Free workspace has no ready video to clip');
+  if (!freeVideo) {
+    // A database whose Free workspace has no ready video (Module 16): bring in the
+    // short talk sample there, as setup, and remove it with the run.
+    freeVideo = {
+      id: await importLink(second.request, 'https://www.youtube.com/watch?v=simtalk0001'),
+    };
+    run.videos.push({ org: SECOND_ORG, id: freeVideo.id });
+    await waitForVideoReady(second.request, freeVideo.id, 120_000);
+  }
   const { clipId } = await createClipApi(second.request, freeVideo.id, 1_000, 6_000);
   run.clips.push({ org: SECOND_ORG, id: clipId });
 
@@ -843,8 +857,11 @@ test('15. Channels: add one, its list, hide and show again, import from it; the 
     .getByRole('button', { name: /^Import / })
     .first()
     .click();
-  const importDialog = page.getByRole('dialog', { name: 'Import Video' });
-  const card = importDialog.getByTestId('clips-link-card');
+  // Since the Clips redesign of 2026-11-20 a channel's Import shows the video in the
+  // Create tab's link box (the rights box focused), not in a dialog of its own.
+  const card = page
+    .getByRole('region', { name: 'Bring In A Video' })
+    .getByTestId('clips-link-card');
   await expect(card).toBeVisible({ timeout: 30_000 });
   await card.getByRole('checkbox', { name: SENTENCES.rights }).click();
   const imported = answer(page, 'POST', '/clips/videos');
@@ -853,7 +870,7 @@ test('15. Channels: add one, its list, hide and show again, import from it; the 
   expect(importResponse.status(), await importResponse.text()).toBe(201);
   const { video } = (await importResponse.json()) as { video: { id: string } };
   run.videos.push({ org: DEMO_ORG, id: video.id });
-  await expect(importDialog).toBeHidden();
+  await expect(card).toBeHidden();
   await waitForVideoReady(page.request, video.id);
 
   // The Free workspace allows one channel: with one added, the second is refused.
@@ -904,10 +921,15 @@ test('16. The library: search, a favourite under Favourites, and an uploaded sou
         .getByRole('button', { name: /^Add (?!To Favourites)/ })
         .getAttribute('aria-label')
     )?.replace(/^Add /, '') ?? '';
+  // Pinned by its name, as the sounds below: the results can re-sort after the first shows.
+  const pinned = tiles
+    .filter({ has: page.getByRole('button', { name: `Add ${stickerName}`, exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Add To Favourites' }) })
+    .first();
   const favSticker = page.waitForRequest(
     (r) => r.method() === 'PUT' && r.url().endsWith('/clips/library/favourites'),
   );
-  await notYet.getByRole('button', { name: 'Add To Favourites' }).click();
+  await pinned.getByRole('button', { name: 'Add To Favourites' }).click();
   const stickerItem = (await favSticker).postDataJSON() as { type: 'sticker'; itemId: string };
   run.favourites.push({ org: DEMO_ORG, type: 'sticker', id: stickerItem.itemId });
   await elements
@@ -928,11 +950,21 @@ test('16. The library: search, a favourite under Favourites, and an uploaded sou
   await audio.getByLabel('Search Sound Effects').fill('o');
   const rows = audio.getByTestId('clip-sound-row');
   await expect(rows.first()).toBeVisible({ timeout: 30_000 });
-  const row = rows.filter({ has: page.getByRole('button', { name: 'Add To Favourites' }) }).first();
+  const candidate = rows
+    .filter({ has: page.getByRole('button', { name: 'Add To Favourites' }) })
+    .first();
   const soundName =
     (
-      await row.getByRole('button', { name: /^Add (?!To Favourites)/ }).getAttribute('aria-label')
+      await candidate
+        .getByRole('button', { name: /^Add (?!To Favourites)/ })
+        .getAttribute('aria-label')
     )?.replace(/^Add /, '') ?? '';
+  // Pinned by its name: the results can still re-sort after the first one shows
+  // (Module 16 saw the favourite land on a neighbour).
+  const row = rows
+    .filter({ has: page.getByRole('button', { name: `Add ${soundName}`, exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Add To Favourites' }) })
+    .first();
   const favSound = page.waitForRequest(
     (r) => r.method() === 'PUT' && r.url().endsWith('/clips/library/favourites'),
   );
@@ -1010,14 +1042,25 @@ test('17. Preview Export renders low resolution and plays; it agrees with the 72
   expect(exports[0]?.quality).toBe('720p');
   expect(preview.fingerprint).toBe(exports[0]?.fingerprint);
 
-  // Frame by frame, the text, the crop and the sticker sit in the same places.
+  // Frame by frame, the text, the crop and the sticker sit in the same places. Both
+  // files are fetched first, so FFmpeg reads local files (Module 16: the FFmpeg
+  // wrapper of a machine with none of its own has no network).
+  const local = async (url: string, name: string) => {
+    const file = path.join(os.tmpdir(), `${RUN}-${name}.mp4`);
+    writeFileSync(file, await (await page.request.get(url)).body());
+    return file;
+  };
+  const previewFile = await local(preview.url, 'preview');
+  const exportFile = await local(shared.exportUrl, 'export');
   for (const at of [0.5, 1.5, 2.5]) {
-    const low = greyFrame(preview.url, at);
-    const full = greyFrame(shared.exportUrl, at);
+    const low = greyFrame(previewFile, at);
+    const full = greyFrame(exportFile, at);
     const { mean, worstBlock } = frameDifference(low, full);
     expect(mean, `mean difference at ${at}s`).toBeLessThan(12);
     expect(worstBlock, `worst block at ${at}s`).toBeLessThan(60);
   }
+  rmSync(previewFile, { force: true });
+  rmSync(exportFile, { force: true });
   // The footer's Close (the corner X is named Close too).
   await dialog.getByRole('button', { name: 'Close', exact: true }).first().click();
   await expect(dialog).toBeHidden();

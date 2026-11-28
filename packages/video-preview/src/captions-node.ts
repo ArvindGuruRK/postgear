@@ -295,8 +295,13 @@ export class CaptionsNode {
     this.words = [];
     this.painted = [];
     this.entrance = '';
+    // A page whose widest word would leave the box is drawn smaller, as the
+    // export names `\fs` at the page's scale (Module 16); the pop is in ems,
+    // so it shrinks with it.
+    const pageSize = page.scale !== undefined && page.scale < 1 ? `${page.scale}em` : '';
     for (const line of page.lines) {
       const row = this.doc.createElement('div');
+      if (pageSize) row.style.fontSize = pageSize;
       const run = this.doc.createElement('span');
       run.style.display = 'inline-block';
       apply(run, css.run);

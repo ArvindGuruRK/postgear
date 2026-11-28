@@ -7,6 +7,10 @@
   the attempt and the time taken, never the input.
 - Answers `model_dump(by_alias=True, mode="json")`: camelCase, JSON types.
 - Turns a cancel into Temporal's own `CancelledError` at the next heartbeat.
+- Turns any other exception into a fixed `MEDIA_TOOL_FAILED` (an invalid key
+  into `MEDIA_BAD_INPUT`) naming only its type, with no cause chain: a
+  library's message can repeat speech, a path or an address, and Temporal
+  stores a failure's message and logs it with its traceback.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from pydantic import BaseModel, ValidationError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError, CancelledError
 
+from postgear_media.core.keys import InvalidKeyError
 from postgear_media.core.logging import get_logger
 
 CONTRACT_VERSION = 1
@@ -73,6 +78,27 @@ def checkpoint(details: dict[str, Any] | None = None) -> None:
         raise Cancelled("The caller cancelled this step")
 
 
+def last_attempt() -> bool:
+    """True inside the last try the caller's retry policy allows (False outside Temporal)."""
+    if not activity.in_activity():
+        return False
+    info = activity.info()
+    policy = info.retry_policy
+    if policy is None or policy.maximum_attempts <= 0:
+        return False
+    return info.attempt >= policy.maximum_attempts
+
+
+def plain_failure(name: str, error: Exception) -> ApplicationError:
+    """`error` as a failure that names its type only: never its message or its cause."""
+    if isinstance(error, InvalidKeyError):
+        return bad_input("A key in the input is not one of ours")
+    return ApplicationError(
+        f"{name} failed on this box ({type(error).__name__})",
+        type="MEDIA_TOOL_FAILED",
+    )
+
+
 def logged[R](name: str, job_id: str | None, work: Callable[[], R]) -> R:
     """Runs `work` with one start line and one end line."""
     attempt = activity.info().attempt if activity.in_activity() else 1
@@ -86,6 +112,11 @@ def logged[R](name: str, job_id: str | None, work: Callable[[], R]) -> R:
     except Cancelled:
         outcome = "cancelled"
         raise
+    except ApplicationError:
+        # Ours: a fixed sentence and a type from the contract's table.
+        raise
+    except Exception as error:  # noqa: BLE001 - any other error leaves as its type only, by design
+        raise plain_failure(name, error) from None
     finally:
         log.info(
             "activity.end",

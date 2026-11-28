@@ -165,6 +165,8 @@ describe('<DetectCamera />', () => {
     fireEvent.click(screen.getByTestId('clip-detect-camera-button'));
     expect(await screen.findByText(FINDING_FACES)).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: FINDING_FACES })).toBeInTheDocument();
+    // Module 16: the words under the bar are read out as they change.
+    expect(screen.getByRole('status')).toHaveTextContent(FINDING_FACES);
     release();
     await waitFor(() => expect(state.steps).toBe(1));
     expect(screen.queryByText(FINDING_FACES)).toBeNull();

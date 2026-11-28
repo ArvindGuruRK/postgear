@@ -407,7 +407,9 @@ function Listen({
     return (
       <div className="flex flex-col gap-2" data-testid="clip-bleep-listening">
         <Progress tone="ai" value={job?.progress ?? 0} aria-label="Listening to this clip" />
-        <p className={NOTE}>{queuedOr(job, BLEEP_LISTENING)}</p>
+        <p className={NOTE} role="status">
+          {queuedOr(job, BLEEP_LISTENING)}
+        </p>
         <WaitingNote job={job} className={NOTE} />
         <Button
           variant="secondary"

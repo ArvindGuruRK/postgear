@@ -376,6 +376,12 @@ export class ClipVideosService {
     }
 
     const isLink = origin.type === 'link';
+    if (origin.type === 'link') {
+      // Module 16: a link is checked again as a new import is (its site's
+      // switch, a rest, a removal after a rights request, the plan), so a site
+      // switched off since the first try is never fetched through a retry.
+      await this.prober.probe(orgId, origin.link.canonicalUrl);
+    }
     await this.limits.assertEnabled(orgId);
     await this.limits.assertLength(orgId, video.durationMs);
     await this.limits.assertStorage(

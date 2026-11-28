@@ -80,7 +80,9 @@ export function FollowSpeaker({
       {phase.kind === 'finding' ? (
         <div className="flex flex-col gap-2" data-testid="clip-follow-finding">
           <Progress tone="ai" value={phase.progress} aria-label={FOLLOW_FINDING} />
-          <p className={NOTE}>{FOLLOW_FINDING}</p>
+          <p className={NOTE} role="status">
+            {FOLLOW_FINDING}
+          </p>
         </div>
       ) : null}
 

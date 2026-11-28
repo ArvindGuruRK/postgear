@@ -153,6 +153,10 @@ describe('FindClips', () => {
     expect(await screen.findByTestId('find-clips-progress')).toHaveTextContent(
       'Waiting for our turn',
     );
+    // Module 16: the step is read out as it changes (the percentage is not, it would chatter).
+    expect(within(screen.getByTestId('find-clips-progress')).getByRole('status')).toHaveTextContent(
+      /^Waiting for our turn/,
+    );
   });
 
   it('a waiting run says about how long, and why a low priority one waits (Module 15)', () => {

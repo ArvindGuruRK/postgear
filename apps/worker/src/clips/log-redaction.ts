@@ -27,6 +27,8 @@ export const LOG_SECRET_NAMES = [
   'YTDLP_PROXY',
   'YTDLP_COOKIES_FILE',
   'AUTOMATION_INTERNAL_TOKEN',
+  // Sprint 13: the header the Python media service checks.
+  'MEDIA_INTERNAL_TOKEN',
   'ENCRYPTION_KEY_AES256',
   'TWITCH_CLIENT_ID',
   'TWITCH_CLIENT_SECRET',
@@ -39,6 +41,8 @@ const MIN_SECRET_LENGTH = 6;
 const ADDRESS_WITH_LOGIN = /([a-z][a-z0-9+.-]*:\/\/)[^\s/@'"]*@/gi;
 const FLAG_VALUES = /(--proxy|--cookies|-http_proxy)(\s+|=)("[^"]*"|'[^']*'|\S+)/g;
 const COOKIES_PATH = /[^\s'"]*cookies\.txt/gi;
+/** Module 16: any bearer token a library error repeats (a Google or Twitch call), defence in depth. */
+const BEARER = /(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi;
 
 /** The parts of a proxy address worth hiding beside the whole address. */
 function proxyParts(proxy: string): string[] {
@@ -81,5 +85,6 @@ export function scrubSecrets(
   return out
     .replace(ADDRESS_WITH_LOGIN, `$1${REDACTED}@`)
     .replace(FLAG_VALUES, `$1$2${REDACTED}`)
-    .replace(COOKIES_PATH, REDACTED);
+    .replace(COOKIES_PATH, REDACTED)
+    .replace(BEARER, `$1${REDACTED}`);
 }

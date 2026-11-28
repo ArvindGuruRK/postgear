@@ -15,7 +15,7 @@ from __future__ import annotations
 from temporalio.exceptions import ApplicationError
 
 from postgear_media.contract.generated import MediaPyStillsInput, MediaPyStillsOutput
-from postgear_media.core.keys import job_file_key
+from postgear_media.core.keys import is_video_key, job_file_key
 from postgear_media.core.scratch import scratch_folder
 from postgear_media.core.storage import StorageNotFoundError
 from postgear_media.providers.vision.simulation import placeholder_still
@@ -30,6 +30,8 @@ def still_key(org_id: str, video_id: str, job_id: str, index: int) -> str:
 def cut_stills(payload: MediaPyStillsInput, deps: VisualDeps) -> MediaPyStillsOutput:
     """Cuts and stores one still at each moment; answers their keys in the order asked."""
     moments = list(payload.moments_ms)
+    if not is_video_key(payload.proxy_key, payload.org_id, payload.video_id):
+        raise bad_input("A job reads only the files of its own video")
     for moment in moments:
         if int(moment.root) >= payload.duration_ms:
             raise bad_input("A still was asked for past the end of the video")

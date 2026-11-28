@@ -45,6 +45,10 @@ export function takenOn(posts: PostSummary[], channelId: string | null, group: s
     .sort((a, b) => a - b);
 }
 
+/** No minute left in the part chosen: it is over, or every minute in it is near a post. */
+export const PART_PASSED = 'That part of the day has passed. Pick another part or another day.';
+export const PART_FULL = 'That part of the day is full. Try another.';
+
 export function RandomTimePanel({
   day,
   onPick,
@@ -60,7 +64,7 @@ export function RandomTimePanel({
 }) {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [picked, setPicked] = useState<Date | null>(null);
-  const [missed, setMissed] = useState(false);
+  const [missed, setMissed] = useState<string | null>(null);
   const dayKey = startOfDay(day).getTime();
 
   useEffect(() => {
@@ -83,21 +87,23 @@ export function RandomTimePanel({
   const taken = takenOn(posts, channelId, group);
 
   function pick(part: DayPart) {
-    const at = randomTimeOfDay({
+    const input = {
       part,
       day: { year: day.getFullYear(), month: day.getMonth() + 1, day: day.getDate() },
       seed: `${part}-${Date.now()}-${Math.random()}`,
       taken,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       from: Date.now(),
-    });
+    };
+    const at = randomTimeOfDay(input);
     if (at === null) {
-      setMissed(true);
+      // With no posts in the way, is there a minute? Then the posts filled it; else it is over.
+      setMissed(randomTimeOfDay({ ...input, taken: [] }) === null ? PART_PASSED : PART_FULL);
       setPicked(null);
       return;
     }
     const next = new Date(at);
-    setMissed(false);
+    setMissed(null);
     setPicked(next);
     onPick(next);
   }
@@ -113,11 +119,7 @@ export function RandomTimePanel({
       </div>
 
       <p aria-live="polite" className="m-0 font-sans text-sm text-ink">
-        {missed
-          ? 'That part of the day has passed. Pick another part or another day.'
-          : picked
-            ? scheduledSentence(picked)
-            : ''}
+        {missed ?? (picked ? scheduledSentence(picked) : '')}
       </p>
 
       <div className="flex flex-col gap-1">

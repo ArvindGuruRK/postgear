@@ -393,8 +393,10 @@ export function CaptionsPanel({
 
         {listening && captions.job ? (
           <div className="flex flex-col gap-2" data-testid="clip-captions-listening">
-            <Progress value={captions.job.progress} aria-label="Listening to this clip" />
-            <p className={NOTE}>{queuedOr(captions.job, CAPTIONS_LISTENING)}</p>
+            <Progress tone="ai" value={captions.job.progress} aria-label="Listening to this clip" />
+            <p className={NOTE} role="status">
+              {queuedOr(captions.job, CAPTIONS_LISTENING)}
+            </p>
             <WaitingNote job={captions.job} className={NOTE} />
             <Button variant="secondary" size="sm" onClick={captions.cancelListening}>
               Cancel
@@ -402,6 +404,7 @@ export function CaptionsPanel({
           </div>
         ) : (
           <Button
+            variant="highlight"
             className="w-full"
             disabled={working || !serviceOn}
             data-testid="clip-captions-add"
@@ -597,7 +600,7 @@ export function CaptionsPanel({
           />
           <Button
             variant="secondary"
-            className="w-full"
+            className="h-auto min-h-11 w-full whitespace-normal py-2"
             disabled={working || translateTo === ''}
             data-testid="clip-captions-translate"
             onClick={() => captions.translate(translateTo)}
@@ -609,7 +612,7 @@ export function CaptionsPanel({
               </>
             ) : (
               <>
-                <MotionIcon icon={LanguagesIcon} className="h-4 w-4" />
+                <MotionIcon icon={LanguagesIcon} className="h-4 w-4 shrink-0" />
                 {pricedLabel(`Translate To ${languageName(translateTo)}`, translatePrice)}
               </>
             )}

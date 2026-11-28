@@ -13,7 +13,13 @@ import { outputDuration } from '../time/time-map';
 import type { Transcript } from '../transcript/types';
 import { type CaptionWord, captionWords } from './map';
 import { type CaptionPage, captionPages } from './pages';
-import { type CaptionScript, hasLetterCase, marksSingleWords, scriptOf, withoutEmoji } from './script';
+import {
+  type CaptionScript,
+  hasLetterCase,
+  marksSingleWords,
+  scriptOf,
+  withoutEmoji,
+} from './script';
 import { type CaptionLook, type CaptionMarkKind, trackLook } from './styles';
 import { measureWith } from './width';
 
@@ -66,9 +72,17 @@ export function captionGeometry(
 /** The padding of the box behind a spoken word (`mark.kind: 'box'`), canvas pixels. */
 export const MARK_BOX_PAD = 10;
 
-/** A word as written: its emoji taken out, in the look's letter case when its script has one. */
+/** How large a popping spoken word starts, in percent (it settles to 100 %). */
+export const CAPTION_WORD_POP_PERCENT = 116;
+
+/**
+ * A word as written: its emoji taken out, in the look's letter case when its
+ * script has one. A word is one line (Module 16): a line break or a tab in it
+ * (a pasted edit) is a space, so it can never add lines the pager did not
+ * plan, in the preview or the export.
+ */
 export function displayWord(text: string, letterCase: CaptionLook['letterCase']): string {
-  const clean = withoutEmoji(text).trim();
+  const clean = withoutEmoji(text).replace(/\s+/g, ' ').trim();
   if (letterCase === 'as_spoken' || !hasLetterCase(scriptOf(clean))) return clean;
   return letterCase === 'upper' ? clean.toLocaleUpperCase('en') : clean.toLocaleLowerCase('en');
 }
@@ -134,6 +148,10 @@ export function captionLayout(input: CaptionLayoutInput): CaptionLayout {
     }),
     clipMs: outputDuration(input.doc),
     display,
+    // Module 16: a page whose one word is too wide is drawn smaller, by exactly enough.
+    fixedWidth: geometry.backingPx * 2,
+    boxWidth: geometry.boxWidth,
+    wordGrowth: mark === 'colour' && look.mark.pop ? CAPTION_WORD_POP_PERCENT / 100 : 1,
   });
   return { geometry, look, mark, script, words, pages };
 }

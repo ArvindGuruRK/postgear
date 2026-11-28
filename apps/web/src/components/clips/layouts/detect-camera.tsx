@@ -147,7 +147,9 @@ export function DetectCamera({
       {finding ? (
         <div className="flex flex-col gap-2">
           <Progress tone="ai" value={phase.progress} aria-label={FINDING_FACES} />
-          <p className={NOTE}>{queuedOr(phase.job, FINDING_FACES)}</p>
+          <p className={NOTE} role="status">
+            {queuedOr(phase.job, FINDING_FACES)}
+          </p>
           <WaitingNote job={phase.job} className={NOTE} />
         </div>
       ) : (

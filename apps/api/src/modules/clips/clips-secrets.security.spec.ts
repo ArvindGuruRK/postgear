@@ -369,6 +369,17 @@ describe('the security log', () => {
     expect(printed.join('\n')).toContain('clips.throttled');
     expect(leaks(printed.join('\n'))).toEqual([]);
   });
+
+  it("redacts the media service's internal token header (Sprint 13)", () => {
+    const token = 'media-internal-token-value-0001';
+    const out = JSON.stringify(
+      redact({
+        request: { headers: { 'X-PostGear-Internal': token, 'x-postgear-internal': token } },
+      }),
+    );
+    expect(out).not.toContain(token);
+    expect(out).toContain('[REDACTED]');
+  });
 });
 
 describe('boot refusals', () => {

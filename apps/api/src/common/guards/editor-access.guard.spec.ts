@@ -104,6 +104,51 @@ describe('RolesGuard against the route matrix', () => {
     expect(logged).toHaveLength(denied.length);
   });
 
+  it("gives a refused Editor the stories' one sentence, and a member the plain refusal (Module 16)", async () => {
+    const denied = routes.filter((route) => matrix.routes[route.key].access === 'deny');
+    const answers = new Set<string>();
+    for (const route of denied) {
+      prisma.userOrganization.findFirst.mockResolvedValue(membershipFor('EDITOR'));
+      const request = { user: userFor('EDITOR'), cookies: { pg_org: ORG_ID } };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => route.handler,
+        getClass: () => route.controller,
+      };
+      try {
+        await guard.canActivate(context as never);
+        answers.add(`${route.key}: allowed`);
+      } catch (error) {
+        answers.add(JSON.stringify((error as ForbiddenException).getResponse()));
+      }
+    }
+    expect([...answers]).toEqual([
+      JSON.stringify({
+        message: 'Editors cannot do this. Ask an admin.',
+        code: 'editor_forbidden',
+      }),
+    ]);
+
+    // A member on an admin route keeps the plain refusal, and a cookie for a
+    // workspace the caller is not in keeps the one answer for all.
+    const adminOnly = routes.find(
+      (route) => route.roles?.length === 1 && route.roles[0] === 'ADMIN',
+    );
+    expect(adminOnly).toBeDefined();
+    for (const caller of ['USER', 'DISABLED_EDITOR'] as const) {
+      prisma.userOrganization.findFirst.mockResolvedValue(membershipFor(caller));
+      const request = { user: userFor(caller), cookies: { pg_org: ORG_ID } };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => (adminOnly as RouteInfo).handler,
+        getClass: () => (adminOnly as RouteInfo).controller,
+      };
+      const refused = await guard.canActivate(context as never).catch((error) => error);
+      expect(refused).toBeInstanceOf(ForbiddenException);
+      expect(JSON.stringify(refused.getResponse())).not.toContain('editor_forbidden');
+    }
+  });
+
   it('leaves admins and members exactly where their decorators put them', async () => {
     const wrong: string[] = [];
     for (const route of routes) {

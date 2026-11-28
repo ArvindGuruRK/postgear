@@ -9,6 +9,8 @@
  * Always seven days. Off keeps the day's words (unticking it brings them
  * back), and an Off day's time and title are not offered while it is off.
  * Every field is one line: a row on the picture has no second line.
+ * Every control is named with its day ("Monday time", "Monday off"), so a
+ * screen reader never hears seven boxes all called Off (Module 16).
  */
 import {
   MAX_SCHEDULE_ROWS,
@@ -75,6 +77,7 @@ export function ScheduleRowsTable({
               <div className="flex shrink-0 items-center gap-2">
                 <Checkbox
                   id={offId}
+                  aria-label={`${name} off`}
                   checked={off}
                   onCheckedChange={(checked) => onOff(index, checked === true)}
                 />

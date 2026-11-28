@@ -78,6 +78,17 @@ describe('CropBox', () => {
     expect(onChange).toHaveBeenLastCalledWith({ x: 0, y: 0, size: 200 });
   });
 
+  it('says its new size and place after a keyboard step (Module 16)', () => {
+    render(<CropBox frame={FRAME} crop={{ x: 0, y: 0, size: 200 }} onChange={jest.fn()} />);
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Crop Box' }), {
+      key: 'ArrowRight',
+      shiftKey: true,
+    });
+    expect(status).toHaveTextContent('200 pixels square, 20 from the left, 0 from the top.');
+  });
+
   it('says the crop will look soft under 112 source pixels', () => {
     const { rerender } = render(<CropNote crop={{ x: 0, y: 0, size: 96 }} />);
     expect(screen.getByTestId('emote-crop-note')).toHaveTextContent('This will look soft.');
@@ -100,6 +111,27 @@ describe('TrimBar', () => {
     expect(screen.getByText('3.0 seconds at most')).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Stretch' }), { key: 'ArrowRight' });
     expect(onChange).toHaveBeenLastCalledWith({ startMs: 5_100, lengthMs: 2_400 });
+  });
+
+  it('sets the length from the keyboard and reads both sliders as times (Module 16)', () => {
+    const onChange = jest.fn();
+    render(
+      <TrimBar
+        durationMs={60_000}
+        stretch={{ startMs: 5_000, lengthMs: 2_400 }}
+        onChange={onChange}
+      />,
+    );
+    const stretchSlider = screen.getByRole('slider', { name: 'Stretch' });
+    expect(stretchSlider).toHaveAttribute('aria-valuetext', '0:05.0 to 0:07.4, 2.4 s');
+    fireEvent.keyDown(stretchSlider, { key: 'ArrowUp' });
+    expect(onChange).toHaveBeenLastCalledWith({ startMs: 5_000, lengthMs: 2_500 });
+    fireEvent.keyDown(stretchSlider, { key: 'ArrowDown' });
+    expect(onChange).toHaveBeenLastCalledWith({ startMs: 5_000, lengthMs: 2_300 });
+    expect(screen.getByRole('slider', { name: 'Start' })).toHaveAttribute(
+      'aria-valuetext',
+      '0:05.0',
+    );
   });
 });
 

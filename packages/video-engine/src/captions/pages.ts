@@ -36,6 +36,14 @@ export interface CaptionPage {
    * `marks[k + 1]` (the last until the page ends).
    */
   marks: number[];
+  /**
+   * Module 16: the share of the track's text size this page is drawn at,
+   * set (below 1) only when one word alone is wider than a line: a very long
+   * word, a caption with no spaces, a long Tamil word. Breaking lines cannot
+   * help such a page, so it is drawn smaller until it fits, never past the
+   * box. Absent on every page that fits at the track's size.
+   */
+  scale?: number;
 }
 
 export interface PageOptions {
@@ -53,9 +61,63 @@ export interface PageOptions {
   clipMs: number;
   /** How a word is written when measured and drawn (letter case). */
   display?: (text: string) => string;
+  /**
+   * The part of a measured line that does not grow with the text size (the
+   * outline or box on both sides), so a page that must be drawn smaller is
+   * shrunk by exactly enough. Default 0.
+   */
+  fixedWidth?: number;
+  /**
+   * How much larger the spoken word briefly draws (the word pop, 1.16), so a
+   * page drawn smaller still fits while its word pops. Default 1.
+   */
+  wordGrowth?: number;
+  /**
+   * The caption box, which a line with its spoken word popped must stay
+   * inside (`lineWidth` is a little inside it). Default `lineWidth`.
+   */
+  boxWidth?: number;
 }
 
 export const PAGE_MAX_GAP_MS = 700;
+/**
+ * The smallest share a page is drawn at. Only reached when the outline alone
+ * is nearly as wide as a line; the longest word a transcript or an edit can
+ * hold (80 letters) at the largest size still fits well above it.
+ */
+export const PAGE_MIN_SCALE = 0.01;
+
+/** One drawn line as `pageScale` sees it: its width, and its widest word's. */
+export interface MeasuredLine {
+  width: number;
+  widestWord: number;
+}
+
+/**
+ * The share of its size a page is drawn at: 1 for every page that fits as it
+ * is. Below 1 only when a line at rest is wider than `lineWidth` (the pager
+ * makes that only for a line of one word: a very long word, a caption with no
+ * spaces), or when its widest word, popped, would carry it past the box
+ * (`boxWidth`). Breaking lines cannot help such a page, so it is drawn smaller.
+ */
+export function pageScale(
+  lines: MeasuredLine[],
+  options: Pick<PageOptions, 'lineWidth' | 'boxWidth' | 'fixedWidth' | 'wordGrowth'>,
+): number {
+  const fixed = Math.max(0, options.fixedWidth ?? 0);
+  const growth = Math.max(1, options.wordGrowth ?? 1);
+  const box = Math.max(options.lineWidth, options.boxWidth ?? options.lineWidth);
+  let scale = 1;
+  for (const line of lines) {
+    const text = line.width - fixed;
+    if (!(text > 0)) continue;
+    const popped = text + (growth - 1) * Math.max(0, line.widestWord - fixed);
+    scale = Math.min(scale, (options.lineWidth - fixed) / text, (box - fixed) / popped);
+  }
+  if (!(scale < 1)) return 1;
+  // Rounded down, so the page is never a rounding error wider than its room.
+  return Math.max(PAGE_MIN_SCALE, Math.floor(scale * 1000) / 1000);
+}
 /** How long a page stays after its last word when nothing follows closely. */
 export const PAGE_LINGER_MS = 260;
 export const PAGE_MAX_LINES = 2;
@@ -84,7 +146,11 @@ export function breakLines(
 }
 
 /** True when these words fit on at most two lines of `lineWidth`. */
-function fits(texts: readonly string[], lineWidth: number, measure: (text: string) => number): boolean {
+function fits(
+  texts: readonly string[],
+  lineWidth: number,
+  measure: (text: string) => number,
+): boolean {
   if (measure(texts.join(' ')) <= lineWidth) return true;
   for (let split = 1; split < texts.length; split += 1) {
     if (
@@ -139,17 +205,23 @@ export function captionPages(words: readonly CaptionWord[], options: PageOptions
       options.clipMs,
       Math.max(last.end, stays ? (next as CaptionWord).start : last.end + lingerMs),
     );
+    const texts = group.map((item) => display(item.text));
+    const lines = breakLines(texts, options.lineWidth, options.measure);
+    const scale = pageScale(
+      lines.map((line) => ({
+        width: options.measure(line.map((position) => texts[position]).join(' ')),
+        widestWord: Math.max(...line.map((position) => options.measure(texts[position] ?? ''))),
+      })),
+      options,
+    );
     return {
       index,
       start: first.start,
       end: Math.max(first.start + 1, next ? Math.min(end, next.start) : end),
       words: group,
-      lines: breakLines(
-        group.map((item) => display(item.text)),
-        options.lineWidth,
-        options.measure,
-      ),
+      lines,
       marks: group.map((item, position) => (position === 0 ? first.start : item.start)),
+      ...(scale < 1 ? { scale } : {}),
     };
   });
 }

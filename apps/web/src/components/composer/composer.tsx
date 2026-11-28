@@ -1048,7 +1048,8 @@ export function Composer({
           </span>
         </p>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        {/* ms-auto: wrapped under the save line (a video's Made With AI row), it stays on the right. */}
+        <div className="ms-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {state.group && !locked ? (
             // A quiet text action, as in the reference: deleting is rarer than
             // saving, and a confirmation follows. Its icon alone on a phone.

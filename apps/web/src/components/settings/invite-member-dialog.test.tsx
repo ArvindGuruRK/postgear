@@ -100,6 +100,10 @@ describe('InviteMemberDialog', () => {
 
     expect(await screen.findByText(EDITOR_EMAIL_REQUIRED)).toBeTruthy();
     expect(apiMock).not.toHaveBeenCalledWith('/orgs/org-1/invites', expect.anything());
+    // Module 16: the field itself says it is wrong, and which sentence explains it.
+    const email = screen.getByLabelText(/^Email/);
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(email).toHaveAccessibleDescription(EDITOR_EMAIL_REQUIRED);
   });
 
   it("shows the API's seat refusal when it refuses anyway", async () => {

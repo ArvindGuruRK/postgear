@@ -158,7 +158,9 @@ export function FindClips({
       {running ? (
         <div className="flex flex-col gap-2" data-testid="find-clips-progress">
           <div className="flex items-center justify-between gap-3 font-sans text-sm text-ink">
-            <span className="type-ui">{jobWords(live)}</span>
+            <span className="type-ui" role="status">
+              {jobWords(live)}
+            </span>
             <span className="tabular-nums type-muted">{Math.round(live?.progress ?? 0)}%</span>
           </div>
           <Progress value={live?.progress ?? 0} tone="ai" aria-label={jobWords(live)} />

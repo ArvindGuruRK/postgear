@@ -21,7 +21,11 @@ export interface ChoiceTileOption<T extends string> {
    * Decorative: the label names it. Takes the place of `icon`.
    */
   drawing?: ReactNode;
-  /** One short sentence under the name. The tile grows to hold it. */
+  /**
+   * One short sentence under the name. The tile grows to hold it, and the
+   * tiles of a row start at their top, so names line up when one line wraps
+   * more than another (Module 16).
+   */
   line?: string;
   /**
    * A small mark on the tile's top right corner, such as a plan lock: it sits
@@ -154,6 +158,8 @@ function Tile<T extends string>({
   onClick: () => void;
 }) {
   const tall = option.drawing !== undefined || option.line !== undefined;
+  // Words only: the names line up at the top. A drawing keeps its tile centred.
+  const topAligned = option.line !== undefined && option.drawing === undefined;
   const button = (
     <button
       type="button"
@@ -162,7 +168,8 @@ function Tile<T extends string>({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'relative flex w-full flex-col items-center justify-center gap-1.5 px-1 type-ui text-sm',
+        'relative flex w-full flex-col items-center gap-1.5 px-1 type-ui text-sm',
+        topAligned ? 'justify-start' : 'justify-center',
         'disabled:pointer-events-none disabled:opacity-50',
         tall ? 'h-full px-3 py-4 text-center' : option.icon ? 'h-16' : 'h-10',
         keyTile(active),
@@ -177,7 +184,10 @@ function Tile<T extends string>({
       ) : null}
       {option.short ?? option.label}
       {option.line ? (
-        <span className="font-sans text-xs leading-snug type-muted">{option.line}</span>
+        // Muted only off: on the chosen tile's fill a muted line fell under 4.5:1 in dark.
+        <span className={cn('font-sans text-xs leading-snug', !active && 'type-muted')}>
+          {option.line}
+        </span>
       ) : null}
       {option.corner ? (
         <span aria-hidden="true" className="absolute -top-2 -right-2 flex">

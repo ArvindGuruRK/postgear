@@ -9,7 +9,7 @@
  * instructions.
  */
 import { z } from 'zod';
-import { block, field } from './fields';
+import { block, field, quotedLine } from './fields';
 
 /** Titles offered for one clip. */
 export const HOOK_TITLE_COUNT = 3;
@@ -57,7 +57,7 @@ export function buildHookTitlePrompt(input: HookTitlePromptInput): {
     field('Language', input.language),
     field('Titles', HOOK_TITLE_COUNT),
     ...(again ? [field('Attempt', attempt)] : []),
-    block('Words', input.text),
+    block('Words', quotedLine(input.text)),
   ].join('\n');
   return { system, user };
 }

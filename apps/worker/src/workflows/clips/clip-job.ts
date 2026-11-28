@@ -148,22 +148,33 @@ export async function runClipJob(
     scope.cancel();
   });
 
+  const bookCancel = () =>
+    CancellationScope.nonCancellable(() => bookkeeping.clipJobCancelled(input)).catch(
+      (cleanupError: unknown) => {
+        log.warn('clip cancel bookkeeping failed', {
+          jobId: input.jobId,
+          kind,
+          error: String(cleanupError),
+        });
+      },
+    );
+
   let outcome: ClipJobOutcome;
   try {
     const result = await scope.run(work);
     outcome = result.status;
+    // Module 16: a step that finished after Cancel and found its row closed
+    // (an import whose video was removed meanwhile) still books the cancel,
+    // or the job would stay open until the reconcile. The bookkeeping is
+    // conditional on the row, so a job someone else closed is left alone.
+    if (cancelRequested && result.status === 'closed') {
+      outcome = 'cancelled';
+      await bookCancel();
+    }
   } catch (error) {
     if (cancelRequested || isCancellation(error)) {
       outcome = 'cancelled';
-      await CancellationScope.nonCancellable(() => bookkeeping.clipJobCancelled(input)).catch(
-        (cleanupError: unknown) => {
-          log.warn('clip cancel bookkeeping failed', {
-            jobId: input.jobId,
-            kind,
-            error: String(cleanupError),
-          });
-        },
-      );
+      await bookCancel();
     } else {
       outcome = 'failed';
       const detail = failureDetail(error);

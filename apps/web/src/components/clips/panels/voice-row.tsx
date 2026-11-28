@@ -247,7 +247,9 @@ export function VoiceRow({
       {jobId !== null ? (
         <div className="flex flex-col gap-2" data-testid="clip-voice-progress">
           <Progress tone="ai" value={current?.progress ?? 0} aria-label={VOICE_MAKING} />
-          <p className={NOTE}>{jobWords(current, VOICE_MAKING)}</p>
+          <p className={NOTE} role="status">
+            {jobWords(current, VOICE_MAKING)}
+          </p>
           <WaitingNote job={current} className={NOTE} />
           <Button
             variant="secondary"

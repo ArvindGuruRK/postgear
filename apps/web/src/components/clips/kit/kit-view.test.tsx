@@ -342,6 +342,13 @@ describe('KitView: brand kit', () => {
     );
   });
 
+  it('keeps the five logo choices on one line in a half-width card (Module 16)', async () => {
+    await renderKit({ initialTab: 'brand-kit' });
+    // The row wraps, so the drawing moves under the choices instead of squeezing them.
+    expect(screen.getByTestId('clip-kit-logo-row').className).toContain('flex-wrap');
+    expect(screen.getByTestId('clip-kit-outro-save').className).toContain('shrink-0');
+  });
+
   it('turns the logo place off for a kit with no logo', async () => {
     await renderKit({ initialTab: 'brand-kit', kits: [kit({ logoUrl: null })] });
     expect(screen.getByRole('button', { name: 'Top Left' })).toBeDisabled();

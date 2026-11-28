@@ -11,6 +11,7 @@
  * Neither ever logs a row, the request or an answer.
  */
 import { normaliseRunError, providerError, withTimeout } from '../model/resilience';
+import { stripMarkup } from '../prompts/fields';
 import {
   buildMomentPrompt,
   buildTitlePrompt,
@@ -112,7 +113,7 @@ export async function pickMoments(
 
 /** A title as kept: no quotes, hashtags or numbering, at most eight words. */
 export function cleanTitle(raw: string): string {
-  const words = raw
+  const words = stripMarkup(raw)
     .replace(/^\s*\d+[.)]\s+/, '')
     .replace(/#[\p{L}\p{N}_]+/gu, ' ')
     .replace(/["“”«»]/g, '')

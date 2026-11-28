@@ -1,6 +1,6 @@
 # Module 09: AI Effects
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done (2026-11-27) | Size: L (one full session)
 > **Depends on**: [Module 03](module-03-captions.md), [Module 04](module-04-transcript-editing-and-speech-cleanup.md)
 > **Stories**: CA-5.1, CA-5.2, CA-5.3, CA-5.4
 > **Next**: [Module 10](module-10-recipes-and-brand-kit.md)

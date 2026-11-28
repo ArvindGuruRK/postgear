@@ -304,6 +304,10 @@ describe('Bleep Bad Words', () => {
       expect(deps.listen).toHaveBeenCalledWith(VIDEO, { fromMs: 0, toMs: 70_000 }),
     );
     expect(await screen.findByTestId('clip-bleep-listening')).toBeInTheDocument();
+    // Module 16: the step under the bar is read out as it changes.
+    expect(
+      within(screen.getByTestId('clip-bleep-listening')).getByRole('status'),
+    ).not.toBeEmptyDOMElement();
   });
 
   it('My Words saves the list and bleeps a word it adds', async () => {
@@ -555,6 +559,10 @@ describe('Text To Speech', () => {
     });
     act(() => jobs.set(job('voice-1', 'RUNNING')));
     expect(screen.getByTestId('clip-voice-progress')).toBeInTheDocument();
+    // Module 16: the step under the bar is read out as it changes.
+    expect(
+      within(screen.getByTestId('clip-voice-progress')).getByRole('status'),
+    ).not.toBeEmptyDOMElement();
 
     act(() => jobs.set(job('voice-1', 'DONE', { assetId: 'asset-7', durationMs: 2_000 })));
     await waitFor(() => expect(countSounds(doc())).toBe(1));

@@ -6,7 +6,7 @@ from typing import Any
 
 from temporalio import activity
 
-from postgear_media.activities.base import answer, checkpoint, logged, parse_input
+from postgear_media.activities.base import answer, checkpoint, last_attempt, logged, parse_input
 from postgear_media.contract.generated import MediaPyTranscribeInput
 from postgear_media.core.settings import get_settings
 from postgear_media.core.storage import create_private_storage
@@ -30,6 +30,7 @@ def media_py_transcribe(payload: dict[str, Any]) -> dict[str, Any]:
             checkpoint=checkpoint,
             simulated=settings.simulation,
             hosted=get_hosted_lane(settings),
+            last_attempt=last_attempt,
         )
         return answer(transcribe(parsed, deps))
 

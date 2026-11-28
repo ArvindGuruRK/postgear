@@ -20,6 +20,7 @@ const SECRETS: Record<string, string> = {
   YTDLP_PROXY: `http://proxyuser42:${PROXY_PASSWORD}@10.9.8.7:3128`,
   YTDLP_COOKIES_FILE: '/run/secrets/operator-youtube-cookies.txt',
   AUTOMATION_INTERNAL_TOKEN: 'ab'.repeat(32),
+  MEDIA_INTERNAL_TOKEN: 'media-internal-token-5a6b7c8d9e0f1a2b3c4d',
   ENCRYPTION_KEY_AES256: 'cd'.repeat(32),
   TWITCH_CLIENT_ID: 'twitch-client-id-7f3a9c',
   TWITCH_CLIENT_SECRET: 'twitch-client-secret-4e8b0d',
@@ -37,6 +38,7 @@ const NOISY = [
   `[http @ 0x55] -http_proxy ${SECRETS.YTDLP_PROXY} refused`,
   `signing with ${SECRETS.CLIPS_URL_SECRET}; S3 ${SECRETS.S3_ACCESS_KEY}/${SECRETS.S3_SECRET_KEY}`,
   `internal ${SECRETS.AUTOMATION_INTERNAL_TOKEN} key ${SECRETS.ENCRYPTION_KEY_AES256}`,
+  `media service refused X-PostGear-Internal: ${SECRETS.MEDIA_INTERNAL_TOKEN}`,
   `helix ${SECRETS.TWITCH_CLIENT_ID} ${SECRETS.TWITCH_CLIENT_SECRET} youtube ${SECRETS.CLIPS_YOUTUBE_API_KEY}`,
 ].join('\n');
 
@@ -138,6 +140,13 @@ describe('scrubSecrets', () => {
 
   it('leaves short values alone, so a one letter setting cannot blank out the log', () => {
     expect(scrubSecrets('a plain sentence', { S3_ACCESS_KEY: 'a' })).toBe('a plain sentence');
+  });
+
+  it('hides any bearer token a library error repeats, with nothing set (Module 16)', () => {
+    const token = 'ya29.a0AfB_byC-drive.token~value+/=';
+    const out = scrubSecrets(`GET /drive/v3/files 401: Authorization: Bearer ${token}`, {});
+    expect(out).not.toContain(token);
+    expect(out).toContain(`Bearer ${REDACTED}`);
   });
 });
 

@@ -392,7 +392,7 @@ export class UsageService {
 
 function meterDef(meter: MeterKey): Extract<EntitlementDef, { type: 'meter' }> {
   const def = REGISTRY[meter] as EntitlementDef | undefined;
-  if (!def || def.type !== 'meter') throw new RangeError(`${String(meter)} is not a meter.`);
+  if (def?.type !== 'meter') throw new RangeError(`${String(meter)} is not a meter.`);
   return def;
 }
 

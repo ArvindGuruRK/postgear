@@ -31,6 +31,7 @@ import {
   decodeTranscript,
   emptyTranscript,
   encodeTranscript,
+  isTranscriptLanguage,
   mergeTranscript,
   readTranscriptAssetMeta,
   type Transcript,
@@ -184,6 +185,18 @@ export async function finishTranscribe(
   } catch (error) {
     if (error instanceof ClipStepError) throw error;
     throw new ClipStepError('transcribe_failed', { retryable: true, cause: error });
+  }
+
+  // Module 16: Detect Automatically may hear a language we cannot draw (the
+  // API refuses one asked for by name before any charge). Nothing is stored,
+  // the job fails with the language sentence and the minutes go back.
+  if (
+    run.input.language === 'auto' &&
+    incoming.words.length > 0 &&
+    !isTranscriptLanguage(incoming.language)
+  ) {
+    await deleteQuietly(run.privateStorage, [heard.heardKey]);
+    throw new ClipStepError('language_unsupported', { retryable: false });
   }
 
   const assets = await run.rows.videoAssets(org, videoId);

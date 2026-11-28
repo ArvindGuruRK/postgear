@@ -23,7 +23,7 @@
  * - Letter case is done here (ASS has no case attribute), and a person's text
  *   is escaped so it can never become an override block.
  */
-import { MARK_BOX_PAD } from '../captions/layout';
+import { CAPTION_WORD_POP_PERCENT, MARK_BOX_PAD } from '../captions/layout';
 import type { CaptionPage } from '../captions/pages';
 import { TEXT_SHADOW } from '../document/text';
 import {
@@ -44,7 +44,7 @@ export const CAPTION_LAYER = 0;
 /** A page that pops in grows from this size, over this long. */
 const PAGE_POP = { fromPercent: 82, ms: 110 };
 /** A marked word that pops starts this large and settles over this long. */
-const WORD_POP = { fromPercent: 116, ms: 90 };
+const WORD_POP = { fromPercent: CAPTION_WORD_POP_PERCENT, ms: 90 };
 const PAGE_FADE_MS = 120;
 /** The caption shadow's offset, as a share of the text size (so it scales with it). */
 export const CAPTION_SHADOW_SHARE = 0.045;
@@ -157,7 +157,9 @@ function pageBody(
 ): string {
   return page.lines
     .map((line) =>
-      line.map((position) => each(position, wordText(words[position] as PlanCaptionWord, main))).join(' '),
+      line
+        .map((position) => each(position, wordText(words[position] as PlanCaptionWord, main)))
+        .join(' '),
     )
     .join('\\N');
 }
@@ -202,11 +204,19 @@ export function captionDialogues(
   };
 
   layout.pages.forEach((page, pageIndex) => {
-    const words = captions.words[pageIndex] ?? [];
+    // Module 16: a page whose one word is wider than the box is drawn smaller
+    // (`page.scale`), every run of it, so it never runs past the box.
+    const scale = page.scale ?? 1;
+    const sized = (run: PlanTextRun): PlanTextRun =>
+      scale === 1 ? run : { ...run, fontSize: run.fontSize * scale };
+    const words = (captions.words[pageIndex] ?? []).map((word) =>
+      scale === 1 ? word : { runs: word.runs.map(sized) },
+    );
     const until = (position: number): number => page.marks[position + 1] ?? page.end;
     // The page's own font: the style's, or the one script font all its words share.
-    const base = pageFont(words, captions.main);
-    const baseFont = sameFont(base, captions.main) ? '' : fontTag(base);
+    const base = pageFont(words, sized(captions.main));
+    // A smaller page always names its size, so `\r` (which puts the style's size back) never undoes it.
+    const baseFont = scale === 1 && sameFont(base, captions.main) ? '' : fontTag(base);
     const main = base;
     const place = `${placeAt}${baseFont}`;
     // `\r` puts the style back, and with it the style's font: the page's own font goes back on.
@@ -239,7 +249,9 @@ export function captionDialogues(
           ? `\\fscx${WORD_POP.fromPercent}\\fscy${WORD_POP.fromPercent}\\t(0,${WORD_POP.ms},\\fscx100\\fscy100)`
           : '';
         body = pageBody(page, words, main, (position, text) =>
-          position === active ? `{\\1c${assColourTag(look.mark.colour)}${pop}}${text}${reset}` : text,
+          position === active
+            ? `{\\1c${assColourTag(look.mark.colour)}${pop}}${text}${reset}`
+            : text,
         );
         // A page pop would be undone by the `\r` after the marked word, so a page with marked words only fades.
         body = `{${place}${first ? entrance(false) : ''}}${body}`;

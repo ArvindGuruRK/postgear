@@ -9,6 +9,10 @@
  *   never a file or a translation: only those have real times to cut by).
  *   Where each word stands (played, cut, outside the clip) and the word
  *   being said are worked out from the document and the playhead.
+ * - **Only the words follow the playhead.** The word being said is read in
+ *   `SpokenTranscriptText`, so as the clip plays the pane's header and
+ *   tools do not draw again, only the text (and in it only the paragraphs
+ *   the word moves through).
  * - **Edits are the editor's.** Delete, Restore, Remove Silences and Remove
  *   Filler Words hand a change to `onApply`, which runs it on the latest
  *   document as one undo step and says the result in a toast with Undo.
@@ -29,6 +33,7 @@ import {
   Spinner,
   TooltipHint,
   TranscriptText,
+  type TranscriptTextProps,
 } from '@postgear/ui';
 import {
   type CaptionsTrack,
@@ -232,12 +237,11 @@ export function TranscriptPane({
     [words, places, document, sourceId],
   );
 
-  // The word being said: this component draws again only when it changes.
+  // The word being said: read by the text alone, which draws again only when it changes.
   const readSpoken = useCallback(
     () => (sourceId ? spokenWordAt(document, words, sourceId, playback.getCurrentMs()) : null),
     [document, words, sourceId, playback],
   );
-  const spokenId = useSyncExternalStore(playback.subscribe, readSpoken, () => null);
   const playing = playback.usePlaying();
   useEffect(() => {
     if (playing) setFollow(true);
@@ -361,7 +365,9 @@ export function TranscriptPane({
     body = (
       <div className="flex flex-col gap-2" data-testid="clip-transcript-listening">
         <Progress tone="ai" value={job?.progress ?? 0} aria-label="Listening to this clip" />
-        <p className={NOTE}>{queuedOr(job, LISTENING)}</p>
+        <p className={NOTE} role="status">
+          {queuedOr(job, LISTENING)}
+        </p>
         <WaitingNote job={job} className={NOTE} />
         <Button
           variant="secondary"
@@ -394,10 +400,11 @@ export function TranscriptPane({
         {manyUnsure(words, places) ? <p className={NOTE}>{UNSURE_NOTE}</p> : null}
         {noneInClip ? <p className={NOTE}>{NO_WORDS_NOTE}</p> : null}
         <div className="min-h-0 flex-1 overflow-y-auto pr-1" onWheel={() => setFollow(false)}>
-          <TranscriptText
+          <SpokenTranscriptText
+            subscribe={playback.subscribe}
+            readSpoken={readSpoken}
             label="Transcript"
             paragraphs={paragraphs}
-            spokenId={spokenId}
             followSpoken={follow}
             onWordPress={seekTo}
             onActivate={seekTo}
@@ -473,6 +480,19 @@ export function TranscriptPane({
 }
 
 /** The word without the punctuation around it: what Replace Everywhere looks for. */
+/** The text with the word being said: the only part of the pane that draws as the clip plays. */
+function SpokenTranscriptText({
+  subscribe,
+  readSpoken,
+  ...props
+}: Omit<TranscriptTextProps, 'spokenId'> & {
+  subscribe: (listener: () => void) => () => void;
+  readSpoken: () => number | null;
+}) {
+  const spokenId = useSyncExternalStore(subscribe, readSpoken, () => null);
+  return <TranscriptText {...props} spokenId={spokenId} />;
+}
+
 function bareWord(text: string): string {
   return text.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 }

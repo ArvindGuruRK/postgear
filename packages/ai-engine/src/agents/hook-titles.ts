@@ -12,6 +12,7 @@
  * Never logs the words or a title.
  */
 import { normaliseRunError, providerError, withTimeout } from '../model/resilience';
+import { stripMarkup } from '../prompts/fields';
 import {
   buildHookTitlePrompt,
   HOOK_TEXT_MAX_CHARS,
@@ -54,7 +55,7 @@ export function hookText(text: string, max = HOOK_TEXT_MAX_CHARS): string {
  * most seven words and 80 characters. May answer '' (nothing usable).
  */
 export function cleanHookTitle(raw: string): string {
-  const words = raw
+  const words = stripMarkup(raw)
     .replace(/\p{Cc}+/gu, ' ')
     .replace(/^\s*(?:\d+[.)]|[-*•])\s+/u, '')
     .replace(/#[\p{L}\p{N}_]*/gu, ' ')

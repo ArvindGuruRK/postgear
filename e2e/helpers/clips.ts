@@ -233,9 +233,14 @@ export function toneWav(seconds = 1.5, hz = 440, rate = 22_050): Buffer {
  * (FFmpeg, the same program the worker renders with), so two renders of the
  * same clip at different sizes can be compared cell by cell.
  */
+/** Read by name, as `probeGif` in clips-ai.ts reads `FFPROBE_PATH` (not a Next variable). */
+const FFMPEG_VARIABLE = 'FFMPEG_PATH';
+
 export function greyFrame(source: string, atSeconds: number, width = 36, height = 64): Buffer {
+  // `FFMPEG_PATH` as the worker reads it (on a machine with no FFmpeg of its own, the
+  // wrapper that runs the worker image's FFmpeg; it has no network, so pass a file).
   const run = spawnSync(
-    'ffmpeg',
+    process.env[FFMPEG_VARIABLE] || 'ffmpeg',
     [
       '-v',
       'error',

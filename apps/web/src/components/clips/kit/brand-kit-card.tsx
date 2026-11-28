@@ -159,7 +159,8 @@ export function BrandKitCard({
 
       <div className="flex flex-col gap-2">
         <GroupLabel id={ids.logo}>Logo On Video</GroupLabel>
-        <div className="flex items-center gap-4">
+        {/* Wraps: in a half-width card the drawing goes under the five choices, never splits them. */}
+        <div className="flex flex-wrap items-center gap-4" data-testid="clip-kit-logo-row">
           <Segmented<LogoChoice>
             labelledBy={ids.logo}
             value={logoValue}
@@ -270,6 +271,7 @@ export function BrandKitCard({
                 <Button
                   variant="secondary"
                   size="sm"
+                  className="shrink-0"
                   disabled={lineBusy || (cleanOutroLine(line) ?? '') === savedLine}
                   onClick={() => void saveLine()}
                   data-testid="clip-kit-outro-save"

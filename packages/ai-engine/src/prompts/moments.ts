@@ -9,7 +9,7 @@
  * person's request are quoted material, never instructions.
  */
 import { z } from 'zod';
-import { block, field } from './fields';
+import { block, field, quotedLine } from './fields';
 
 /** At most this many picks from one window. */
 export const PICKS_PER_WINDOW = 3;
@@ -78,9 +78,9 @@ export function buildMomentPrompt(input: MomentPromptInput): { system: string; u
   const user = [
     field('Language', input.language),
     field('Genre', input.genre),
-    field('Request', input.request || 'None'),
+    field('Request', quotedLine(input.request) || 'None'),
     field('Rows', input.rows.length),
-    block('Transcript', input.rows.map((row) => `${row.n}. ${row.text}`).join('\n')),
+    block('Transcript', input.rows.map((row) => `${row.n}. ${quotedLine(row.text)}`).join('\n')),
   ].join('\n');
   return { system, user };
 }
@@ -102,7 +102,10 @@ export function buildTitlePrompt(input: TitlePromptInput): { system: string; use
   const user = [
     field('Language', input.language),
     field('Moments', input.moments.length),
-    block('Moments', input.moments.map((text, index) => `${index + 1}. ${text}`).join('\n')),
+    block(
+      'Moments',
+      input.moments.map((text, index) => `${index + 1}. ${quotedLine(text)}`).join('\n'),
+    ),
   ].join('\n');
   return { system, user };
 }

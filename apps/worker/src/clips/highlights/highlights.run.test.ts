@@ -826,6 +826,20 @@ describe('runHighlights', () => {
     expect(storage.objects.has(highlightsSignalsKey(ORG, VIDEO_ID, JOB_ID))).toBe(false);
   });
 
+  it('the slow marker holds nothing with real providers (Module 16)', async () => {
+    const { make } = await setup({ title: `Sample ${SLOW_MARKER}` });
+    let naps = 0;
+    const run = make({
+      simulated: false,
+      sleep: async () => {
+        naps += 1;
+      },
+    });
+    const outcome = await runHighlights(run);
+    expect(outcome.finished).toBe(true);
+    expect(naps).toBe(0);
+  });
+
   it('a cancel inside a producer is a cancel, not a failure that is skipped', async () => {
     const { controller, make } = await setup();
     const run = make({

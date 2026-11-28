@@ -974,6 +974,13 @@ const REQUEST_STOP_WORDS = new Set([
   'parts',
 ]);
 
+/** The forcing switch for picks with rows that do not exist (see `simulatePicks`). */
+export const MODEL_BAD_ROWS_SWITCH = '[simulate:model-bad-rows]';
+const MODEL_BAD_ROWS_MARKER = /\[simulate:model-bad-rows\]/i;
+const MODEL_BAD_ROWS_ALL = /\[simulate:model-bad-rows\]/gi;
+/** The first row number a forced bad pick names: no transcript has this many rows. */
+const MODEL_BAD_ROW = 90_001;
+
 function numberedLines(body: string): Array<{ n: number; text: string }> {
   const out: Array<{ n: number; text: string }> = [];
   for (const line of body.split('\n')) {
@@ -989,10 +996,16 @@ function numberedLines(body: string): Array<{ n: number; text: string }> {
  * with the two rows after it. Five parts from the same hash. Gaming and
  * Podcast seed differently, so they pick (and order) differently.
  * `[simulate:pick-bad-row]` in a row answers a row number that does not exist.
+ * `[simulate:model-bad-rows]` in the request (Clip Setup's "What should we
+ * look for?") makes the first and third pick of every window name rows past
+ * the end of the transcript, for the caller's row check to drop; the marker
+ * itself is no word to look for.
  */
 function simulatePicks(user: string) {
   const genre = (readField(user, 'Genre') ?? 'Auto').toLowerCase();
-  const request = (readField(user, 'Request') ?? 'None').toLowerCase();
+  const asked = readField(user, 'Request') ?? 'None';
+  const badRows = MODEL_BAD_ROWS_MARKER.test(asked);
+  const request = (asked.replace(MODEL_BAD_ROWS_ALL, ' ').trim() || 'None').toLowerCase();
   const wanted =
     request === 'none'
       ? []
@@ -1033,6 +1046,13 @@ function simulatePicks(user: string) {
       shareable: 6 + ((seed >> 16) % 15),
       funny: /\b(ha|haha|lol|funny|joke)\b/i.test(span),
       matchesRequest: wanted.length > 0 && matches(span),
+    });
+  }
+  if (badRows) {
+    picks.forEach((pick, index) => {
+      if (index % 2 !== 0) return;
+      pick.fromRow = MODEL_BAD_ROW + index;
+      pick.toRow = MODEL_BAD_ROW + index + 2;
     });
   }
   return { picks };

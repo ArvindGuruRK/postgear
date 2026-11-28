@@ -241,6 +241,15 @@ describe('TranscriptPane', () => {
     await waitFor(() => expect(api.getClipWords).toHaveBeenCalledTimes(2));
   });
 
+  it('reads out what listening is doing while it runs (Module 16)', async () => {
+    api.getClipWords?.mockResolvedValue({ transcript: null, ranges: [], missing: false, price: 2 });
+    api.listenToVideo?.mockResolvedValue({ covered: false, job: { id: 'job-1' } });
+    setup();
+    fireEvent.click(await screen.findByTestId('clip-transcript-listen-button'));
+    const listening = await screen.findByTestId('clip-transcript-listening');
+    expect(within(listening).getByRole('status')).not.toBeEmptyDOMElement();
+  });
+
   it('offers Listen for the rest when the clip was only partly listened to', async () => {
     api.getClipWords?.mockResolvedValue({ ...view(), price: 2 });
     setup();

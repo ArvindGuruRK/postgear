@@ -86,6 +86,13 @@ describe('the Schedule element', () => {
     expect(scheduleRowsOf(current())?.[0].title).toBe('Minecraft Hardcore');
   });
 
+  it('names each Off box with its day (Module 16)', () => {
+    mount(twitch());
+    expect(screen.getByRole('checkbox', { name: 'Monday off' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Sunday off' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Off' })).toBeNull();
+  });
+
   it('turns a day off and on with its words kept', () => {
     const { current } = mount(twitch());
     const box = screen.getAllByRole('checkbox')[0];

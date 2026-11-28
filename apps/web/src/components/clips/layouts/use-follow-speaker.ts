@@ -17,7 +17,8 @@
  *   each. The face file stays in memory for them; a clip opened already
  *   following reads it once, quietly, for the strip.
  * - **Follow on first open**: once per mount, when asked (`followOnOpen`),
- *   with the same flow, silent when it fails or finds nobody, and skipped
+ *   with the same flow, silent when it fails, one toast when it finds nobody
+ *   ("Follow The Speaker was skipped: ..."), and skipped
  *   when the person changed the layout while the faces loaded.
  */
 import {
@@ -37,6 +38,7 @@ import { toast } from '@postgear/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { ensureClipFaces, readClipFaces } from '@/lib/clips-api';
+import { skipSentence } from '../editor/recipe-model';
 import { readFaceFileBytes } from './detect-camera-model';
 import {
   canShowBoth as canShowBothFor,
@@ -94,6 +96,9 @@ export const FOLLOW_DEPS: FollowSpeakerDeps = {
     toast({ title });
   },
 };
+
+/** "Follow The Speaker was skipped: we could not find anyone to follow." */
+export const FOLLOW_SKIPPED = skipSentence({ part: 'follow', reason: 'no_faces' });
 
 export type FollowPhase =
   | { kind: 'idle' }
@@ -271,6 +276,9 @@ export function useFollowSpeaker({
         if (outcome === 'many' && !options.silent) setPhase({ kind: 'many', people });
         else if (outcome === 'none' && !options.silent) setPhase({ kind: 'none' });
         else setPhase({ kind: 'idle' });
+        // The first open asked to follow (Auto-Edit, Clip Setup) and nobody is
+        // in the clip: say the part was skipped, once, as the recipes do (Module 16).
+        if (outcome === 'none' && options.silent) latest.current.deps.notify(FOLLOW_SKIPPED);
       } catch (error) {
         if (signal.aborted) return;
         fail(error instanceof ApiError && error.message ? error.message : FOLLOW_FAILED);

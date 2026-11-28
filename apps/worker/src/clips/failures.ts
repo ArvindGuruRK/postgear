@@ -74,7 +74,8 @@ export function classifyClipError(error: unknown): {
     return { code: error.code, retryable: !CLIP_NON_RETRYABLE.includes(error.code) };
   }
   // A picture that is not usable is the same next time; only a tool fault is retried.
-  if (error instanceof StickerError) return { code: error.code, retryable: error.code === 'tool_failed' };
+  if (error instanceof StickerError)
+    return { code: error.code, retryable: error.code === 'tool_failed' };
   // Out of disk here: another worker (or this one, a minute later) may have room.
   if (error instanceof DiskSpaceError) return { code: 'clips_busy', retryable: true };
   if (error instanceof ToolMissingError) return { code: 'tools_offline', retryable: true };
@@ -88,9 +89,35 @@ export function classifyClipError(error: unknown): {
 }
 
 /**
+ * Sprint 13: the activities that hold words of speech, a line to be spoken or
+ * a model's answer. An unexpected error inside one can repeat that text (a
+ * database client prints the values it was handed, a JSON parser quotes its
+ * input), so their log line names the error's kind only, never its message.
+ */
+export const SPEECH_ACTIVITIES: ReadonlySet<string> = new Set([
+  'clipTranscribePrepare',
+  'clipTranscribeFinish',
+  'clipSpeechPrepare',
+  'clipSpeechFinish',
+  'clipHighlights',
+  'clipHighlightsLook',
+  'clipHighlightsFinish',
+  'clipAutoEdit',
+]);
+
+/** What the log line says about an error: its message, or only its kind in a speech activity. */
+function failureReason(error: unknown, activity: string): string {
+  if (SPEECH_ACTIVITIES.has(activity)) {
+    return error instanceof Error ? error.name : typeof error;
+  }
+  return scrubSecrets(error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+}
+
+/**
  * The failure an activity throws. Logs the real cause (never stored, never
  * shown), with the proxy, the cookies file and every other secret scrubbed
- * out first: a tool's stderr can repeat what it was given.
+ * out first: a tool's stderr can repeat what it was given. In a speech
+ * activity only the cause's kind is logged (`SPEECH_ACTIVITIES`).
  */
 export function clipFailure(
   error: unknown,
@@ -107,9 +134,7 @@ export function clipFailure(
         activity: context.activity,
         jobId: context.jobId,
         code,
-        reason: scrubSecrets(
-          error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-        ),
+        reason: failureReason(error, context.activity),
         stderrTail: stderrTail === undefined ? undefined : scrubSecrets(stderrTail),
       }),
     );

@@ -242,9 +242,11 @@ export function InviteMemberDialog({
                   autoComplete="off"
                   autoFocus
                   variant={error ? 'error' : 'default'}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? `${id}-email-error` : undefined}
                 />
                 {error ? (
-                  <FormErrorMessage>{error}</FormErrorMessage>
+                  <FormErrorMessage id={`${id}-email-error`}>{error}</FormErrorMessage>
                 ) : editor ? (
                   <FormHelperText>{EDITOR_EMAIL_HELP}</FormHelperText>
                 ) : sendEmail ? null : (
